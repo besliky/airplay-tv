@@ -15,6 +15,9 @@ val appVersionCode: Int = appVersionName.split('.', '-').take(3)
     .let { (it + listOf(0, 0, 0)).take(3) }
     .let { (major, minor, patch) -> major * 10000 + minor * 100 + patch }
 
+// GitHub repository whose releases the in-app update installs (-PupdateRepository=owner/name for a fork).
+val updateRepository: String = (findProperty("updateRepository") as String?) ?: "besliky/airplay-tv"
+
 // Release signing. Credentials come from environment variables (CI secrets) or from an
 // untracked keystore.properties file. When neither is present, release builds are signed
 // with the local debug key so that they stay installable for testing.
@@ -47,6 +50,7 @@ android {
         targetSdk = 35
         versionCode = appVersionCode
         versionName = appVersionName
+        buildConfigField("String", "UPDATE_REPOSITORY", "\"$updateRepository\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 

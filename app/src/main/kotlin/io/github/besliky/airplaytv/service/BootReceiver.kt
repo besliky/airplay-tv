@@ -5,8 +5,10 @@ import android.content.Context
 import android.content.Intent
 import io.github.besliky.airplaytv.Log
 import io.github.besliky.airplaytv.Settings
+import io.github.besliky.airplaytv.ui.MainActivity
+import io.github.besliky.airplaytv.update.Updater
 
-/** Brings the receiver back after a reboot or an app update. */
+/** Brings the receiver back after a reboot or an app update, and the app's screen after an update it installed. */
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val action = intent.action ?: return
@@ -15,6 +17,13 @@ class BootReceiver : BroadcastReceiver() {
         if (settings.enabled && settings.startAutomatically) {
             Log.i(Log.Category.SERVICE, "starting after $action")
             ReceiverService.start(context)
+        }
+        if (action == Intent.ACTION_MY_PACKAGE_REPLACED && Updater.justUpdated(context)) {
+            try {
+                context.startActivity(Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            } catch (e: RuntimeException) {
+                Log.w(Log.Category.SERVICE, "cannot reopen the app after the update", e)
+            }
         }
     }
 

@@ -68,6 +68,24 @@ object Dialogs {
             .show()
     }
 
+    fun confirm(activity: Activity, title: CharSequence, message: CharSequence, confirmLabel: Int, onConfirm: () -> Unit) {
+        builder(activity)
+            .setTitle(title)
+            .setMessage(message)
+            .setPositiveButton(confirmLabel) { _, _ -> onConfirm() }
+            .setNegativeButton(R.string.dialog_cancel, null)
+            .show()
+    }
+
+    /** A message that changes while some work runs. Leaving the dialog calls [onCancel]. */
+    fun progress(activity: Activity, title: CharSequence, message: CharSequence, onCancel: () -> Unit): AlertDialog =
+        builder(activity)
+            .setTitle(title)
+            .setMessage(message)
+            .setNegativeButton(R.string.dialog_cancel) { _, _ -> onCancel() }
+            .setOnCancelListener { onCancel() }
+            .show()
+
     fun message(activity: Activity, title: CharSequence, message: CharSequence) {
         builder(activity)
             .setTitle(title)

@@ -50,7 +50,6 @@
     <string name="setting_reset_pairing">Reset Pairing</string>
     <string name="setting_paired_devices">Paired Devices</string>
     <string name="setting_licenses">Open Source Licenses</string>
-    <string name="setting_version">Version</string>
     <string name="value_fps">%1$d fps</string>
     <string name="value_4k_unavailable">4K needs a hardware HEVC decoder</string>
 
@@ -100,4 +99,22 @@
     <string name="dialog_remote_volume_title">Remote volume keys</string>
     <string name="dialog_remote_volume_message">For streaming sticks whose volume buttons do not change the sound: while something plays over AirPlay, the remote’s volume and mute buttons change the AirPlay volume instead.\n\nLeave this on TV if the buttons already work.</string>
 
+    <!-- updates -->
+    <string name="setting_update">Software Update</string>
+    <string name="value_update_available">%1$s available</string>
+    <string name="update_checking">Checking for updates…</string>
+    <string name="update_up_to_date">AirPlay TV %1$s is the latest version.</string>
+    <string name="update_available_title">AirPlay TV %1$s</string>
+    <string name="update_install">Install</string>
+    <string name="update_downloading">Downloading… %1$d%%</string>
+    <string name="update_verifying">Checking the download…</string>
+    <string name="update_failed_title">Update failed</string>
+    <string name="update_failed_network">GitHub could not be reached. Check the TV’s internet connection and try again.</string>
+    <string name="update_failed_download">The download was incomplete or damaged. Try again.</string>
+    <string name="update_failed_no_apk">This release has no package for this TV (%1$s).</string>
+    <string name="update_failed_signature">The update is signed with a different key than the installed app, so Android refuses it. Install it once by hand, after uninstalling the current version.</string>
+    <string name="update_failed_install">Android did not install the update (%1$s).</string>
+    <string name="update_allow_title">Allow updates</string>
+    <string name="update_allow_message">To install updates, allow AirPlay TV to install apps on the next screen. The update continues when you come back.</string>
+    <string name="update_allow_open">Open Settings</string>
 </resources>

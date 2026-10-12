@@ -76,6 +76,8 @@ jobs:
             echo "adb install AirPlayTV-v${version}-arm64.apk"
             echo '```'
             echo
+            echo "Already installed? On the TV: **Advanced → Software Update**."
+            echo
             if [ -s changes.md ]; then
               echo "## Changes"
               cat changes.md
@@ -92,11 +94,15 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          # v1.2.3-rc.1 and the like are test versions: only a TV running a test version offers them
+          prerelease=false
+          case "$TAG" in *-*) prerelease=true ;; esac
           if gh release view "$TAG" > /dev/null 2>&1; then
             gh release upload "$TAG" app/build/dist/* --clobber
-            gh release edit "$TAG" --notes-file release-notes.md
+            gh release edit "$TAG" --notes-file release-notes.md --prerelease="$prerelease"
           else
             gh release create "$TAG" app/build/dist/* \
               --title "AirPlay TV ${TAG#v}" \
-              --notes-file release-notes.md
+              --notes-file release-notes.md \
+              --prerelease="$prerelease"
           fi
