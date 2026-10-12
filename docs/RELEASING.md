@@ -28,7 +28,19 @@ the signatures and publishes a GitHub release with:
 - `SHA256SUMS`
 - release notes with install instructions, the changelog section and checksums
 
+A tag with a suffix (`v0.3.0-rc.1`) is published as a pre-release. TVs offer it under
+Software Update only when they run a test version themselves; everyone else gets the next
+release.
+
 A release can be rebuilt from an existing tag with *Run workflow* on the Release workflow.
+
+## Updates on the TV
+
+Advanced → Software Update reads `https://api.github.com/repos/<owner>/<name>/releases`,
+where the repository is `besliky/airplay-tv` unless the app is built with
+`-PupdateRepository=owner/name`. It needs the asset names this workflow produces
+(`AirPlayTV-v<version>-<abi>.apk` and `SHA256SUMS`) and the release signing key: a
+package signed with another key does not install over the app.
 
 ## Signing
 

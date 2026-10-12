@@ -21,6 +21,16 @@ open-source components. Their license texts are shipped inside the app
   sockets, no GStreamer, no libplist, no OpenSSL) and hardened against
   malformed input.
 
+## geekylaneorgcf/airplay-tv (music, photos, wake)
+
+- Source: https://github.com/geekylaneorgcf/airplay-tv, a fork of this project
+- Author: Ashish Jullia (2026)
+- License: GPL-3.0-or-later, like this project
+- Used in: the Now Playing screen (layout, transitions, cover colours, OLED care, lyrics
+  view, sleep after music), the player icons, the photo viewer, the pause and stale
+  progress handling, the DACP remote control and the remote volume keys. The features
+  were reworked and reorganised for this project; the icons are used as they are.
+
 ## playfair
 
 - Source: https://github.com/EstebanKubata/playfair (as distributed with UxPlay)

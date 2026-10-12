@@ -9,6 +9,8 @@ any later version. See LICENSE.
 This product includes software developed by third parties:
 
   - UxPlay / RPiPlay / shairplay AirPlay protocol logic (GPL-3.0 / LGPL-2.1)
+  - Now Playing, photo viewer and player icons from the airplay-tv fork by
+    Ashish Jullia, github.com/geekylaneorgcf/airplay-tv (GPL-3.0-or-later)
   - playfair by Esteban Kubata (GPL-3.0)
   - Mbed TLS, Copyright The Mbed TLS Contributors (Apache-2.0)
   - Monocypher, Copyright Loup Vaillant, Michael Savage, Fabio Scotoni (BSD-2-Clause)

@@ -3,14 +3,15 @@
 **Screen mirroring from iPhone and iPad to Android TV, the way a TV with built-in AirPlay does it.**
 
 Open Control Center on the iPhone, tap *Screen Mirroring*, pick your TV — the phone's
-screen appears on the TV. No app to open on the TV first, no account, no cloud.
+screen appears on the TV. Play music to it, and the TV shows what is playing. No app to
+open on the TV first, no account, no cloud.
 
 ![Home screen](docs/images/home.png)
 
 AirPlay TV is a small, open-source AirPlay receiver for Android TV and Google TV. It runs
 as a background service, starts with the TV, announces itself on the local network and
 brings up the picture automatically when a sender connects. Video is decoded by the TV's
-hardware decoder straight onto the screen. The APK is about 350 KB.
+hardware decoder straight onto the screen. The APK is about 400 KB.
 
 ## Features
 
@@ -21,6 +22,16 @@ hardware decoder straight onto the screen. The APK is about 350 KB.
   - Picture pauses and resumes with the sender (lock screen, app switches)
 - **Audio** during mirroring (AAC-ELD) and as an AirPlay speaker for music (ALAC, AAC-LC),
   volume controlled from the sender
+- **Now Playing** for music: cover, title, artist and album, progress, volume, a backdrop
+  tinted by the cover, and transitions in the direction of travel. The TV remote pauses and
+  skips on the phone (also from other apps, through the system's media keys). Optional
+  time-synced lyrics. The screen protects OLED panels: it drifts slowly, dims, turns into a
+  small wandering card and goes black during long pauses
+- **Photos** from the Photos app, full screen with a dissolve between pictures
+- **Turns the TV on** when a sender connects while it is in standby (over HDMI-CEC on
+  streaming sticks), and optionally back off a few minutes after the music
+- **Updates on the TV**: Advanced → Software Update installs a new release from GitHub,
+  verified against its checksums, without a USB drive or a computer
 - **Always available**: starts on boot, survives app updates and process restarts,
   re-announces itself after network changes and when the TV wakes up
 - **Low latency**: hardware decoding into the display surface, vendor low-latency decoder
@@ -28,18 +39,22 @@ hardware decoder straight onto the screen. The APK is about 350 KB.
 - **Optional PIN pairing**: first connection of each iPhone requires the code shown on the
   TV, afterwards it is remembered; pairing can be reset at any time
 - **Performance overlay** (fps, bitrate, decode time, latency, drops) and a diagnostics export
-- **Private by design**: local network only, no internet access needed, no analytics
+- **Private by design**: local network only, no analytics; the internet is used only for
+  what you ask for (see [Privacy](#privacy))
 
 ## Status
 
-Version 0.1.0 is the first release. The protocol core — pairing, PIN pairing, session
-setup, the encrypted mirror and audio streams and all parsers of network input — is covered
-by unit, loopback and fuzz tests that run on every commit. The app has been run end to end
-on an Android TV emulator with a protocol-level test sender: discovery, mirroring with
-audio, PIN pairing, autostart after a reboot and recovery after the process is killed.
-It has not yet been tried with a real iPhone on TV hardware, so reports from real TVs and
-iPhones are very welcome; please attach the diagnostics export (Advanced → Export
-Diagnostics).
+Version 0.2.0 adds music, photos and updates on the TV. The protocol core — pairing, PIN
+pairing, session setup, the encrypted mirror and audio streams, track info, photos and all
+parsers of network input — is covered by unit, loopback and fuzz tests that run on every
+commit. The app has been run end to end on an Android TV emulator with a protocol-level test
+sender: discovery, mirroring with audio, music with track info, cover, pause and track
+changes, PIN pairing, autostart after a reboot, recovery after the process is killed, and an
+update installed from a GitHub release. How iPhones report pauses and their remote-control
+service follows what the [fork](#thanks) these features come from found with real iPhones;
+photos follow the protocol notes and have not been confirmed with an iPhone yet. Reports
+from real TVs and iPhones are very welcome; please attach the diagnostics export
+(Advanced → Export Diagnostics).
 
 ## Install
 
@@ -61,6 +76,19 @@ Diagnostics).
 
 From then on nothing needs to be opened on the TV. Press **Back** on the remote to stop
 mirroring; pressing **Home** leaves the session (and its audio) running in the background.
+While music plays, play/pause, left and right on the remote control the phone, and Down
+shows the lyrics when they are on.
+
+![Now Playing](docs/images/now-playing.png)
+
+### Updates
+
+**Advanced → Software Update** looks for a newer release, shows what changed and installs
+it. The first time, Android asks to allow AirPlay TV to install apps; Google TV may also
+show a Play Protect notice for apps from outside the Play Store (**More details → Install
+anyway**). Updates install only over a version signed with the same key, i.e. the APKs
+from the releases page. Test versions (`-rc.1` and the like) are offered only to a TV that
+runs a test version.
 
 ## Settings
 
@@ -72,7 +100,27 @@ mirroring; pressing **Home** leaves the session (and its audio) running in the b
 | Start Automatically | Start the receiver when the TV boots |
 | Show Connection Info | Show the TV's IP address on screen |
 | Open Automatically | Permission to show the picture as soon as mirroring starts |
-| Advanced | Preferred decoder, resolution limit (720p / 1080p / 4k), frame rate (30 / 60), performance overlay, detailed logs, export diagnostics, paired devices, reset pairing, licenses |
+| Music | Lyrics, Sleep After Music, Remote Volume Keys (see below) |
+| Advanced | Preferred decoder, resolution limit (720p / 1080p / 4k), frame rate (30 / 60), performance overlay, detailed logs, export diagnostics, paired devices, reset pairing, licenses, software update |
+
+**Music**
+
+- **Lyrics** (off by default): time-stamped lyrics from [LRCLIB](https://lrclib.net) for the
+  song that is playing. Only its title and artist are sent.
+- **Sleep After Music** (off, 2, 5, 10 or 20 minutes): when AirPlay turned the TV on and
+  nobody used the remote, the TV goes back to sleep this long after the music ends. Android
+  allows that only to an accessibility service, which has to be switched on once from a
+  computer (it receives no events and cannot read the screen):
+
+  ```
+  adb shell settings put secure enabled_accessibility_services io.github.besliky.airplaytv/io.github.besliky.airplaytv.service.SleepService
+  adb shell settings put secure accessibility_enabled 1
+  ```
+
+  If other accessibility services are on already, add this one to the colon-separated list.
+- **Remote Volume Keys** (TV or AirPlay): for streaming sticks whose volume buttons change
+  nothing you can hear (the stick leaves the volume to the TV over HDMI-CEC, which some TVs
+  ignore). With *AirPlay*, the buttons change the AirPlay volume while something plays.
 
 <img src="docs/images/pin.png" width="480" alt="PIN pairing">
 
@@ -97,11 +145,11 @@ still on 7.x are rare.
   similar) show a black screen or stop mirroring. This is enforced on the iPhone and is not
   a receiver problem.
 - **Not supported**: AirPlay 2 multi-room audio, AirPlay "video" URL playback (e.g. the
-  AirPlay button inside some video apps, which uses HLS instead of mirroring), HomeKit
-  pairing. Mirroring and AirPlay audio work.
+  AirPlay button inside some video apps, which uses HLS instead of mirroring), photo
+  slideshows, HomeKit pairing. Mirroring, AirPlay audio and photos work.
 - **One sender at a time**: a new sender replaces the current one.
-- **Sleeping TVs**: the TV has to be on, or in a standby mode that keeps the network up.
-  AirPlay cannot wake a TV that has powered its network down.
+- **Sleeping TVs**: in a standby mode that keeps the network up, the TV is turned on when a
+  sender connects. AirPlay cannot wake a TV that has powered its network down.
 - **Opening automatically** needs the *Display over other apps* permission on Android 10+
   (see Install). Without it a notification offers to open the picture.
 - **Audio/video sync**: both streams are played with minimal delay rather than being
@@ -110,12 +158,16 @@ still on 7.x are rare.
 
 ## Privacy
 
-AirPlay TV works entirely inside your local network and needs no internet connection.
+AirPlay TV works inside your local network and needs no internet connection.
 
 - No analytics, telemetry, crash reporting, advertising, accounts or cloud services.
-- The only network activity is the Bonjour (mDNS) announcement through Android's own
-  service discovery and incoming AirPlay connections. Connections from outside the TV's
-  local subnet are refused.
+- On its own, the app only announces itself over Bonjour (mDNS) through Android's service
+  discovery, accepts AirPlay connections and, while music plays, sends the remote's
+  play/pause and skip commands to the phone. Connections from outside the TV's local subnet
+  are refused.
+- It goes to the internet only when you ask: **Software Update** asks GitHub
+  (api.github.com, github.com) for releases when you select it, and **Lyrics**, when you
+  turn it on, sends the title and artist of the playing song to lrclib.net.
 - The receiver's pairing key is encrypted with a key held in the Android Keystore. Paired
   devices are stored as public keys only. Backups are disabled.
 - Diagnostics are written to the app's own storage on the TV and are never sent anywhere;
@@ -126,13 +178,18 @@ AirPlay TV works entirely inside your local network and needs no internet connec
 ```
 iPhone ──mDNS──▶ Android NSD (_airplay._tcp, _raop._tcp)
    │
-   └──RTSP/TCP──▶ native receiver (C, libairplaytv.so)
-                    ├─ pairing (Ed25519/X25519, SRP PIN), FairPlay setup
-                    ├─ mirror stream (TCP, AES-CTR) ──▶ AMediaCodec ──▶ Surface
-                    └─ audio (RTP/UDP, AES-CBC) ──▶ AAC/ALAC ──▶ AudioTrack
+   ├──RTSP/TCP──▶ native receiver (C, libairplaytv.so)
+   │                ├─ pairing (Ed25519/X25519, SRP PIN), FairPlay setup
+   │                ├─ mirror stream (TCP, AES-CTR) ──▶ AMediaCodec ──▶ Surface
+   │                ├─ audio (RTP/UDP, AES-CBC) ──▶ AAC/ALAC ──▶ AudioTrack
+   │                ├─ track info, cover, progress (SET_PARAMETER)
+   │                └─ photos (HTTP PUT /photo)
+   ◀──DACP/HTTP── play/pause and skip from the TV remote
 
 BootReceiver ──▶ ReceiverService (foreground) ──▶ NetworkMonitor, Advertiser
-                        └── MirrorActivity (full-screen surface, PIN, overlay)
+                        ├── MirrorActivity (full-screen surface, PIN, overlay)
+                        ├── NowPlayingActivity (music) and PhotoActivity
+                        └── NowPlayingTracker, MediaKeys, DacpClient
 ```
 
 The protocol core is C; decoding and rendering use the NDK media APIs, so video never
@@ -184,6 +241,16 @@ core/third_party/  vendored Mbed TLS subset, Monocypher, playfair, ALAC decoder
 core/tests/ unit, loopback and fuzz tests, test sender
 docs/       architecture, testing, releasing
 ```
+
+## Thanks
+
+The music, photo and wake features of version 0.2.0 were inspired by the fork
+[geekylaneorgcf/airplay-tv](https://github.com/geekylaneorgcf/airplay-tv) by Ashish Jullia,
+who turned this receiver into a music player for a Fire TV Stick on an OLED TV and worked
+out on real hardware how iPhones report track info, pauses and the remote-control service.
+The Now Playing screen, its OLED care, the lyrics, sleep after music, the remote volume keys
+and the photo viewer follow their design, and their work was the starting point for this
+release. Thank you!
 
 ## License
 

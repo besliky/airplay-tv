@@ -4,10 +4,10 @@
 
 | Suite | What it covers | Where it runs |
 |---|---|---|
-| `core/tests` unit tests | binary plist, RTSP parser, crypto known-answer vectors (NIST AES, RFC 7748 X25519, RFC 8032 Ed25519, SHA), pair-verify, SRP, FairPlay framing, mirror parsing (avcC/hvcC, AVCC→Annex-B), audio jitter buffer, ALAC | CI (clang, ASan + UBSan), any Android device via adb |
-| `core/tests` loopback tests | complete sessions against the real server over sockets: legacy pairing, no pairing, PIN pairing (right and wrong PIN, remembered sender), sender takeover, receiver-side disconnect, sender vanishing, PIN hidden when the sender leaves, hostile and half-open connections, encrypted mirror and audio streams compared byte for byte | same |
-| fuzzers | `bplist`, `rtsp`, `mirror`, `alac` and the complete request handler (`server`) with libFuzzer | CI, 60 s per target per run |
-| JVM unit tests | name sanitising, settings keys, key validation, hex helpers | CI |
+| `core/tests` unit tests | binary plist, RTSP parser, DMAP track info, crypto known-answer vectors (NIST AES, RFC 7748 X25519, RFC 8032 Ed25519, SHA), pair-verify, SRP, FairPlay framing, mirror parsing (avcC/hvcC, AVCC→Annex-B), audio jitter buffer, ALAC | CI (clang, ASan + UBSan), any Android device via adb |
+| `core/tests` loopback tests | complete sessions against the real server over sockets: legacy pairing, no pairing, PIN pairing (right and wrong PIN, remembered sender), sender takeover, receiver-side disconnect, sender vanishing, PIN hidden when the sender leaves, hostile and half-open connections, encrypted mirror and audio streams compared byte for byte, track info, cover, progress and remote-control identity, photos (cache, event channel, PIN mode) | same |
+| fuzzers | `bplist`, `rtsp`, `mirror`, `alac`, `dmap` and the complete request handler (`server`) with libFuzzer | CI, 60 s per target per run |
+| JVM unit tests | name sanitising, settings keys, key validation, hex helpers, LRC lyrics, version ordering, release notes | CI |
 | instrumentation tests | the real foreground service answering RTSP over loopback, TXT records, malformed traffic, a device name already taken on the network (substitute name, name taken back once free) | Android TV emulator |
 | lint | Android lint on the release variant, no issues allowed to accumulate | CI |
 
@@ -42,11 +42,32 @@ adb shell /data/local/tmp/airplaytv_sender 127.0.0.1 7000 20 --pair --audio
 adb shell /data/local/tmp/airplaytv_sender 127.0.0.1 7000 10 --pin-screen   # with Require PIN on
 ```
 
+`--music` plays like a music app instead: no picture, but track info, a cover and the
+position, a pause from 40 to 55 % of the time and a second track without a cover after it.
+The Now Playing screen opens by itself.
+
+```
+adb shell /data/local/tmp/airplaytv_sender 127.0.0.1 7000 30 --pair --music
+```
+
 The FairPlay key exchange cannot be reproduced without Apple's implementation; the
 sender derives the stream key with the receiver's own playfair code, so both ends
 agree on the key. Everything else is exercised exactly as with a real sender.
 
 ![Test stream on the emulator](images/test-stream.png)
+
+## Looking at the screens without a phone
+
+Debug builds include a preview that fills the Now Playing and photo screens with made-up
+content, for parts that otherwise take minutes or a remote to see:
+
+```
+adb shell am start -n io.github.besliky.airplaytv/.PreviewActivity --es show now
+```
+
+`show` is one of `now`, `pause`, `lyrics`, `dim`, `ambient`, `blank`, `goodnight`,
+`volume`, `next`, `previous`, `photo` and `photo2`. Back restores the real state. Capture
+the screen with `adb exec-out screencap -p > shot.png`.
 
 ## Verified on the Android TV emulator (API 36, x86_64)
 
@@ -60,10 +81,18 @@ agree on the key. Everything else is exercised exactly as with a real sender.
 - autostart after reboot (`BOOT_COMPLETED` → foreground service → published)
 - restart after the process was killed
 - receiver restart and re-publication after settings changes
+- music with the test sender: Now Playing opens, track info, cover and colours, progress,
+  the pause (icon, smaller cover), a track change that drops the old cover, closing at the
+  end of the session
+- Software Update from a release build: the GitHub release found, the arm64/x86_64
+  package downloaded and verified, the system installer (and Google TV's Play Protect
+  notice) and the new version installed with the app as its installer
 
 ## Needs a real TV and iPhone
 
 - discovery and mirroring from iOS (FairPlay key exchange with a real sender)
+- track info, pauses, the remote control (DACP) and photos from a real iPhone; turning a
+  TV on and off over HDMI-CEC
 - hardware decoders of TV SoCs (Amlogic, MediaTek, Realtek, Qualcomm), vendor
   low-latency modes, `setOutputSurface` support
 - AAC-ELD mirroring audio and lip sync on HDMI outputs

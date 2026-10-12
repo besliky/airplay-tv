@@ -3,7 +3,8 @@
 AirPlay TV has two layers: a protocol and media core written in C
 (`libairplaytv.so`, about 300 KB), and a thin Kotlin layer for the Android
 lifecycle, service discovery, settings and the screens. Media data never
-crosses JNI except decoded PCM on its way to `AudioTrack`.
+crosses JNI except decoded PCM on its way to `AudioTrack`, and covers and photos
+as the encoded pictures the sender sent.
 
 ```
                         ┌──────────────────────── Android (Kotlin) ────────────────────────┐
@@ -11,15 +12,18 @@ crosses JNI except decoded PCM on its way to `AudioTrack`.
  MY_PACKAGE_REPLACED    │                  ├─ NetworkMonitor (ConnectivityManager callback) │
  SCREEN_ON              │                  ├─ Advertiser (NsdManager: _airplay, _raop)      │
                         │                  ├─ AudioOutput (AudioTrack writer thread)        │
-                        │                  └─ ReceiverState ─▶ MainActivity / MirrorActivity│
+                        │                  ├─ NowPlayingTracker, MediaKeys, DacpClient      │
+                        │                  └─ ReceiverState ─▶ MainActivity, MirrorActivity,│
+                        │                                      NowPlayingActivity, Photos   │
                         └──────────────┬──────────────────────────────────▲─────────────────┘
                                  JNI   │ start/stop, surface, TXT records │ events (session,
-                                       ▼                                  │ video size, PIN)
+                                       ▼                                  │ video, PIN, track)
                         ┌──────────────────────────── native core (C) ─────────────────────┐
  iPhone ──RTSP/TCP────▶ │ airplay.c  RTSP server: /info, pairing, fp-setup, SETUP, …       │
                         │   ├─ pairing.c / srp.c   Ed25519 + X25519 pair-verify, SRP PIN    │
                         │   ├─ fairplay.c + playfair   stream key hand-over                  │
                         │   ├─ ntp.c     timing requests to the sender                      │
+                        │   ├─ dmap.c    track info from music apps                         │
  ──mirror TCP────────▶ │   ├─ mirror.c  AES-CTR, AVCC→Annex-B, parameter sets ─┐           │
  ──RTP/UDP───────────▶ │   └─ audio_rtp.c  AES-CBC, jitter buffer, resend     ─┼─┐         │
                         │ android/video_decoder.c  AMediaCodec ──▶ Surface ◀────┘ │         │
@@ -41,8 +45,9 @@ mirroring. It was not wrapped but rewritten around these goals:
   wake-up pipe. An idle receiver has one native thread and wakes up for nothing.
   The server loop only uses a timer while connections exist.
 - **Hostile input.** Every length, offset and index from the network is checked
-  before use. Limits: 16 KiB request headers, 2 MiB bodies, 32 headers, 8
-  connections, 32 MiB mirror packets, bounded plist depth and node count. The
+  before use. Limits: 16 KiB request headers, 2 MiB bodies (16 MiB for a photo
+  upload), 32 headers, 8 connections, 32 MiB mirror packets, bounded plist depth and
+  node count, bounded DMAP nesting. The
   upstream code this is based on had several unchecked lengths (FairPlay mode
   index, pairing payload sizes, SPS/PPS parsing, ALAC sample counts); these are
   all validated here and covered by tests and fuzzers.
@@ -61,6 +66,24 @@ mirroring. It was not wrapped but rewritten around these goals:
 4. `SETUP` with streams: type 110 opens the mirroring TCP port, type 96 the audio
    UDP ports. `TEARDOWN` ends a stream or the session; `POST /feedback` is the
    sender's heartbeat.
+
+### Track info, remote control and photos
+
+- `SET_PARAMETER` carries what a music app plays: DMAP track info (`minm`, `asar`,
+  `asal`, parsed by `dmap.c`), the cover as an image (an empty `image/none` means the
+  track has none) and `progress: start/current/end` in RTP timestamps. They are reported
+  only for the session on screen.
+- Requests carry `DACP-ID` and `Active-Remote`. The first names the sender's
+  remote-control service (`_dacp._tcp`, `iTunes_Ctrl_<id>`), the second is the token its
+  commands need. Only a 64-bit hex id and a 32-bit decimal token are accepted, because
+  both end up in a service name and an HTTP header. `DacpClient` finds the service with
+  NSD and sends `GET /ctrl-int/1/playpause|nextitem|previtem` over a plain socket (the
+  app-wide cleartext policy stays strict).
+- Photos use the HTTP/1.1 side of AirPlay on the same port: `GET /server-info`,
+  `POST /reverse` (the event channel, kept open while a photo is shown; closing it ends
+  the photo session), `PUT /photo` with `X-Apple-AssetKey` and `cacheOnly` /
+  `displayCached` backed by a cache of 8 photos and 48 MB, and `POST /stop`. In PIN mode
+  photos need a paired sender. AirPlay video and slideshows are refused and logged.
 
 One session is active at a time. A new sender's `SETUP` replaces the current
 session, so a phone that disappeared without saying goodbye never blocks the TV.
@@ -107,6 +130,10 @@ mirror socket ─▶ payload buffer ─▶ AES-CTR (in place) ─▶ AVCC→Anne
   oldest samples are dropped so latency cannot creep up during long sessions.
 - Mirroring audio uses `PERFORMANCE_MODE_LOW_LATENCY` and a buffer of at most
   80 ms. Volume changes from the sender are applied to the `AudioTrack`.
+- Senders do not announce a pause; they stop sending audio. The writer reports a pause
+  after 300 ms without audio and the moment it comes back. The progress update a sender
+  sends at a pause can repeat an old position, so an update that came right around the
+  pause is replaced by the position from before it.
 
 ## Android lifecycle
 
@@ -131,9 +158,27 @@ mirror socket ─▶ payload buffer ─▶ AES-CTR (in place) ─▶ AVCC→Anne
   as soon as the session ends. Decoders, audio output and their threads exist only
   during a session.
 - **Opening the picture**: the service starts `MirrorActivity` when mirroring
-  begins or a PIN must be shown. Android 10+ allows this from the background only
-  with the *Display over other apps* permission; otherwise a notification with a
-  full-screen intent is posted.
+  begins or a PIN must be shown, `NowPlayingActivity` when music (non-mirroring audio)
+  starts and `PhotoActivity` for a photo. Android 10+ allows this from the background
+  only with the *Display over other apps* permission; for mirroring, a notification with
+  a full-screen intent is posted otherwise.
+- **Turning the TV on**: when a sender connects while the screen is off, a short
+  `ACQUIRE_CAUSES_WAKEUP` wake lock turns it on (a stick's TV follows over HDMI-CEC), and
+  the playback screens use `setTurnScreenOn`. If AirPlay turned the TV on and nobody
+  used the remote, *Sleep After Music* locks the screen again through an accessibility
+  service, the only way an app may put a TV device to sleep.
+- **Now Playing** keeps no state of its own: `NowPlayingTracker` turns the native events
+  into `ReceiverState.nowPlaying` (track changes and their direction, cover colours, a
+  position that runs between updates, a cover dropped when a new track brings none),
+  and a `MediaSession` routes the remote's media keys to the sender while another app is
+  in front. Covers and photos are decoded on a background thread, shrunk to the screen
+  and turned upright by their EXIF orientation.
+- **Updates**: `Updater` reads the GitHub releases only when the user selects Software
+  Update, picks the package of the running ABI, checks it against the release's
+  `SHA256SUMS` and hands it to `PackageInstaller`. Android installs it only over an app
+  signed with the same key. Once the app installed itself, Android 12+ lets later
+  updates through without asking again; after an update the service restarts through
+  `MY_PACKAGE_REPLACED` and the app reopens.
 
 ## Threads
 
@@ -141,11 +186,13 @@ mirror socket ─▶ payload buffer ─▶ AES-CTR (in place) ─▶ AVCC→Anne
 |---|---|
 | Idle | main thread, one native server thread (blocked in `poll`) |
 | Mirroring with audio | + mirror receiver, decoder output, audio receiver, timing, AudioTrack writer |
+| Music | + audio receiver, timing, AudioTrack writer; image decoding and remote commands on demand |
 
 ## Security
 
 - Local network only: connections whose source is not in one of the TV's
-  subnets (or IPv6 link-local) are closed immediately.
+  subnets (or IPv6 link-local) are closed immediately. The internet is used only for
+  Software Update (when selected) and Lyrics (when turned on), both over HTTPS.
 - Keys: the receiver identity is an Ed25519 key generated on the device and
   stored encrypted by an Android Keystore AES-GCM key. Key material is wiped from
   memory after use. No secrets, PINs or sender names are logged.
