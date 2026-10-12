@@ -42,6 +42,23 @@ typedef struct {
     void (*pin_display)(void *ctx, const char *pin);
     /* A sender completed PIN pairing and should be remembered. */
     void (*client_paired)(void *ctx, const char *client_key_b64, const char *client_name);
+
+    /* The callbacks below are optional. They describe the active session only. */
+
+    /* Track info pushed by the sender. Strings are UTF-8 and may be empty. */
+    void (*track_info)(void *ctx, const char *title, const char *artist, const char *album);
+    /* Cover art as an encoded image, valid during the call; NULL when the track has none. */
+    void (*artwork)(void *ctx, const uint8_t *data, size_t len);
+    /* Playback position in RTP timestamp units of the audio stream. */
+    void (*progress)(void *ctx, uint32_t start, uint32_t current, uint32_t end);
+    /* The sender's remote-control (DACP) service id and the token every command must carry.
+     * Reported when they first appear and whenever they change. */
+    void (*remote_control)(void *ctx, const char *dacp_id, const char *active_remote);
+
+    /* A photo from the sender's Photos app (JPEG or PNG), valid during the call. */
+    void (*photo)(void *ctx, const uint8_t *data, size_t len);
+    /* The sender ended the photo session. */
+    void (*photo_stop)(void *ctx);
 } airplay_events_t;
 
 typedef struct {

@@ -149,7 +149,8 @@ rtsp_parse_result_t rtsp_parse_request(const uint8_t *buf, size_t len, rtsp_requ
                 if (have_length) {
                     return RTSP_PARSE_BAD;
                 }
-                content_length = parse_uint(h->value, strlen(h->value), RTSP_MAX_BODY);
+                long long max_body = strcmp(req->method, "PUT") == 0 ? RTSP_MAX_PUT_BODY : RTSP_MAX_BODY;
+                content_length = parse_uint(h->value, strlen(h->value), max_body);
                 if (content_length < 0) {
                     return RTSP_PARSE_TOO_LARGE;
                 }
@@ -271,7 +272,9 @@ int rtsp_reply_serialize(const rtsp_reply_t *reply, const char *protocol, uint8_
     if (reply->content_type && n < cap) {
         n += (size_t) snprintf(buf + n, cap - n, "Content-Type: %s\r\n", reply->content_type);
     }
-    if ((reply->body_len || reply->content_type) && n < cap) {
+    /* An HTTP connection stays open after the answer, so every final answer states its length. */
+    bool http = protocol && strncmp(protocol, "HTTP/", 5) == 0;
+    if ((reply->body_len || reply->content_type || (http && status >= 200)) && n < cap) {
         n += (size_t) snprintf(buf + n, cap - n, "Content-Length: %zu\r\n", reply->body_len);
     }
     if (n + 2 + reply->body_len > cap) {

@@ -106,20 +106,10 @@ void fs_close(fake_sender_t *f) {
     }
 }
 
-int fs_request(fake_sender_t *f, const char *method, const char *url, const char *content_type,
-               const void *data, size_t len, int *status, uint8_t **body, size_t *body_len) {
-    char head[512];
-    int n = snprintf(head, sizeof(head), "%s %s RTSP/1.0\r\nCSeq: %d\r\nUser-Agent: %s\r\n", method, url,
-                     ++f->cseq, f->user_agent);
-    if (content_type) {
-        n += snprintf(head + n, sizeof(head) - (size_t) n, "Content-Type: %s\r\n", content_type);
-    }
-    n += snprintf(head + n, sizeof(head) - (size_t) n, "Content-Length: %zu\r\n\r\n", len);
-    if (send_all(f->fd, head, (size_t) n) != 0 || (len && send_all(f->fd, data, len) != 0)) {
-        return -1;
-    }
-
-    /* read the response head */
+/* Reads one reply (RTSP/1.0 or HTTP/1.1). The head is copied to head when it is not NULL;
+ * *body is malloc'd and may be NULL. */
+static int read_reply(fake_sender_t *f, int *status, char *head, size_t head_cap, uint8_t **body,
+                      size_t *body_len) {
     char buf[4096];
     size_t got = 0;
     char *end = NULL;
@@ -137,8 +127,13 @@ int fs_request(fake_sender_t *f, const char *method, const char *url, const char
     }
     size_t head_len = (size_t) (end - buf) + 4;
     int code = 0;
-    if (sscanf(buf, "RTSP/1.0 %d", &code) != 1) {
+    if (sscanf(buf, "RTSP/1.0 %d", &code) != 1 && sscanf(buf, "HTTP/1.1 %d", &code) != 1) {
         return -1;
+    }
+    if (head && head_cap) {
+        size_t n = head_len < head_cap ? head_len : head_cap - 1;
+        memcpy(head, buf, n);
+        head[n] = 0;
     }
     size_t content_length = 0;
     char *cl = strstr(buf, "Content-Length: ");
@@ -146,11 +141,14 @@ int fs_request(fake_sender_t *f, const char *method, const char *url, const char
         content_length = (size_t) strtoul(cl + 16, NULL, 10);
     }
     uint8_t *out = content_length ? (uint8_t *) malloc(content_length) : NULL;
+    if (content_length && !out) {
+        return -1;
+    }
     size_t have = got - head_len;
     if (have > content_length) {
         have = content_length;
     }
-    if (out && have) {
+    if (have) {
         memcpy(out, buf + head_len, have);
     }
     while (have < content_length) {
@@ -175,6 +173,34 @@ int fs_request(fake_sender_t *f, const char *method, const char *url, const char
         free(out);
     }
     return 0;
+}
+
+int fs_request(fake_sender_t *f, const char *method, const char *url, const char *content_type,
+               const void *data, size_t len, int *status, uint8_t **body, size_t *body_len) {
+    char head[768];
+    int n = snprintf(head, sizeof(head), "%s %s RTSP/1.0\r\nCSeq: %d\r\nUser-Agent: %s\r\n%s", method, url,
+                     ++f->cseq, f->user_agent, f->extra_headers);
+    if (content_type) {
+        n += snprintf(head + n, sizeof(head) - (size_t) n, "Content-Type: %s\r\n", content_type);
+    }
+    n += snprintf(head + n, sizeof(head) - (size_t) n, "Content-Length: %zu\r\n\r\n", len);
+    if (send_all(f->fd, head, (size_t) n) != 0 || (len && send_all(f->fd, data, len) != 0)) {
+        return -1;
+    }
+    return read_reply(f, status, NULL, 0, body, body_len);
+}
+
+int fs_http(fake_sender_t *f, const char *method, const char *url, const char *headers, const void *data,
+            size_t len, char *reply_head, size_t head_cap, uint8_t **body, size_t *body_len) {
+    char head[1024];
+    int n = snprintf(head, sizeof(head), "%s %s HTTP/1.1\r\nUser-Agent: MediaControl/1.0\r\n%sContent-Length: %zu\r\n\r\n",
+                     method, url, headers ? headers : "", len);
+    if (n <= 0 || (size_t) n >= sizeof(head) || send_all(f->fd, head, (size_t) n) != 0 ||
+        (len && send_all(f->fd, data, len) != 0)) {
+        return -1;
+    }
+    int status = 0;
+    return read_reply(f, &status, reply_head, head_cap, body, body_len) == 0 ? status : -1;
 }
 
 static int request_plist(fake_sender_t *f, const char *method, const char *url, bp_node_t *req,
@@ -752,6 +778,39 @@ int fs_set_volume(fake_sender_t *f, float db) {
     int status = 0;
     return fs_request(f, "SET_PARAMETER", "rtsp://127.0.0.1/1234", "text/parameters", text, (size_t) n, &status,
                       NULL, NULL) == 0 && status == 200 ? 0 : -1;
+}
+
+int fs_set_track(fake_sender_t *f, const char *title, const char *artist, const char *album) {
+    /* mlit { minm, asar, asal }, as iOS sends it */
+    const char *tags[3] = { "minm", "asar", "asal" };
+    const char *values[3] = { title, artist, album };
+    uint8_t body[1024];
+    size_t n = 8;
+    for (int i = 0; i < 3; i++) {
+        size_t len = strlen(values[i]);
+        if (n + 8 + len > sizeof(body)) {
+            return -1;
+        }
+        memcpy(body + n, tags[i], 4);
+        wr32be(body + n + 4, (uint32_t) len);
+        memcpy(body + n + 8, values[i], len);
+        n += 8 + len;
+    }
+    memcpy(body, "mlit", 4);
+    wr32be(body + 4, (uint32_t) (n - 8));
+    return fs_set_parameter(f, "application/x-dmap-tagged", body, n);
+}
+
+int fs_set_progress(fake_sender_t *f, uint32_t start, uint32_t current, uint32_t end) {
+    char text[64];
+    int n = snprintf(text, sizeof(text), "progress: %u/%u/%u\r\n", start, current, end);
+    return fs_set_parameter(f, "text/parameters", text, (size_t) n);
+}
+
+int fs_set_parameter(fake_sender_t *f, const char *content_type, const void *data, size_t len) {
+    int status = 0;
+    return fs_request(f, "SET_PARAMETER", "rtsp://127.0.0.1/1234", content_type, data, len, &status, NULL, NULL) == 0 &&
+                   status == 200 ? 0 : -1;
 }
 
 int fs_feedback(fake_sender_t *f) {

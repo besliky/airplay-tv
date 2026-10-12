@@ -11,6 +11,7 @@
 #include <stdlib.h>
 
 #include "bplist.h"
+#include "dmap.h"
 #include "rtsp.h"
 #include "test.h"
 #include "util.h"
@@ -208,6 +209,18 @@ TEST(rtsp_rejects_malformed) {
     free(endless);
 }
 
+TEST(rtsp_photo_uploads_may_be_larger) {
+    /* 5 MB is waiting for its body when it is a PUT, and refused for anything else */
+    const char *put = "PUT /photo HTTP/1.1\r\nContent-Length: 5000000\r\n\r\n";
+    const char *post = "POST /photo HTTP/1.1\r\nContent-Length: 5000000\r\n\r\n";
+    const char *too_big = "PUT /photo HTTP/1.1\r\nContent-Length: 16777217\r\n\r\n";
+    rtsp_request_t req;
+    size_t used = 0;
+    CHECK_EQ(rtsp_parse_request((const uint8_t *) put, strlen(put), &req, &used), RTSP_PARSE_INCOMPLETE);
+    CHECK_EQ(rtsp_parse_request((const uint8_t *) post, strlen(post), &req, &used), RTSP_PARSE_TOO_LARGE);
+    CHECK_EQ(rtsp_parse_request((const uint8_t *) too_big, strlen(too_big), &req, &used), RTSP_PARSE_TOO_LARGE);
+}
+
 TEST(rtsp_too_many_headers) {
     char buf[4096];
     int o = snprintf(buf, sizeof(buf), "GET /info RTSP/1.0\r\n");
@@ -241,6 +254,86 @@ TEST(rtsp_reply_serialization) {
     CHECK(rtsp_reply_serialize(&reply, "RTSP/1.0", &out, &len) == 0);
     CHECK_MEM(out, "RTSP/1.0 470 Connection Authorization Required\r\n\r\n", len);
     free(out);
+
+    /* HTTP keeps the connection open, so even an empty answer states its length */
+    CHECK(rtsp_reply_serialize(&reply, "HTTP/1.1", &out, &len) == 0);
+    CHECK_MEM(out, "HTTP/1.1 470 Connection Authorization Required\r\nContent-Length: 0\r\n\r\n", len);
+    free(out);
+    rtsp_reply_init(&reply);
+    rtsp_reply_status(&reply, 101, "Switching Protocols");
+    CHECK(rtsp_reply_serialize(&reply, "HTTP/1.1", &out, &len) == 0);
+    CHECK_MEM(out, "HTTP/1.1 101 Switching Protocols\r\n\r\n", len);
+    free(out);
+}
+
+/* ---- DMAP track info ---- */
+
+/* Writes one DMAP item (tag, big-endian length, payload) and returns its size. */
+static size_t dmap_item(uint8_t *out, const char *tag, const void *data, size_t len) {
+    memcpy(out, tag, 4);
+    out[4] = (uint8_t) (len >> 24);
+    out[5] = (uint8_t) (len >> 16);
+    out[6] = (uint8_t) (len >> 8);
+    out[7] = (uint8_t) len;
+    if (len) memcpy(out + 8, data, len);
+    return 8 + len;
+}
+
+TEST(dmap_track_info) {
+    uint8_t inner[256];
+    size_t n = 0;
+    const uint8_t mper[8] = { 0, 0, 0, 0, 0, 0, 0, 1 };
+    n += dmap_item(inner + n, "mper", mper, sizeof(mper));
+    n += dmap_item(inner + n, "minm", "Midnight City", 13);
+    n += dmap_item(inner + n, "asar", "M83", 3);
+    n += dmap_item(inner + n, "asal", "Hurry Up, We\xe2\x80\x99re Dreaming", 26);
+    uint8_t body[300];
+    size_t len = dmap_item(body, "mlit", inner, n);
+    dmap_track_t t;
+    dmap_parse_track(body, len, &t);
+    CHECK_STR(t.title, "Midnight City");
+    CHECK_STR(t.artist, "M83");
+    CHECK_STR(t.album, "Hurry Up, We\xe2\x80\x99re Dreaming");
+
+    /* items outside a listing count as well; missing ones stay empty */
+    len = dmap_item(body, "minm", "Intro", 5);
+    dmap_parse_track(body, len, &t);
+    CHECK_STR(t.title, "Intro");
+    CHECK_STR(t.artist, "");
+    CHECK_STR(t.album, "");
+}
+
+TEST(dmap_rejects_broken_lengths) {
+    /* a listing that claims more bytes than there are */
+    const uint8_t broken[16] = { 'm', 'l', 'i', 't', 0xff, 0xff, 0xff, 0xf0, 'm', 'i', 'n', 'm', 0, 0, 0, 4 };
+    dmap_track_t t;
+    dmap_parse_track(broken, sizeof(broken), &t);
+    CHECK_STR(t.title, "");
+    /* every truncation of a valid body must be safe */
+    uint8_t body[64];
+    size_t len = dmap_item(body, "minm", "Title", 5);
+    len += dmap_item(body + len, "asar", "Artist", 6);
+    for (size_t cut = 0; cut <= len; cut++) {
+        dmap_parse_track(body, cut, &t);
+    }
+    dmap_parse_track(NULL, 0, &t);
+    CHECK_STR(t.title, "");
+}
+
+TEST(dmap_long_text_is_cut_on_a_character_boundary) {
+    static uint8_t text[1200];
+    memset(text, 'x', sizeof(text));
+    text[254] = 0xc3; /* a two-byte sequence across the 255-byte limit */
+    text[255] = 0xa9;
+    static uint8_t body[1300];
+    size_t len = dmap_item(body, "minm", text, sizeof(text));
+    dmap_track_t t;
+    dmap_parse_track(body, len, &t);
+    CHECK_EQ(strlen(t.title), 254);
+    /* invalid UTF-8 and control characters do not get through */
+    len = dmap_item(body, "asar", "A\xff\nB", 4);
+    dmap_parse_track(body, len, &t);
+    CHECK_STR(t.artist, "A??B");
 }
 
 /* ---- utilities ---- */

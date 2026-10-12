@@ -24,7 +24,7 @@ target_compile_options(airplaytv_sender PRIVATE ${COMMON_FLAGS})
 
 if(AIRPLAYTV_FUZZ)
     target_compile_definitions(airplay_core PUBLIC AIRPLAYTV_FUZZING)
-    foreach(target bplist rtsp mirror alac server)
+    foreach(target bplist rtsp mirror alac dmap server)
         add_executable(fuzz_${target} fuzz/fuzz_${target}.c)
         target_link_libraries(fuzz_${target} PRIVATE airplay_core)
         target_compile_options(fuzz_${target} PRIVATE -fsanitize=fuzzer)

@@ -77,6 +77,7 @@ add_library(airplay_core STATIC
     src/audio_rtp.c
     src/bplist.c
     src/crypto.c
+    src/dmap.c
     src/fairplay.c
     src/log.c
     src/mirror.c

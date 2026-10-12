@@ -31,6 +31,7 @@ typedef struct {
     struct sockaddr_in server;
     int cseq;
     char user_agent[64];
+    char extra_headers[160];  /* "Name: value\r\n" lines added to every RTSP request */
 
     uint8_t ed_secret[ED25519_SECRET_SIZE];
     uint8_t ed_public[ED25519_KEY_SIZE];
@@ -80,6 +81,16 @@ int fs_send_video(fake_sender_t *f, const uint8_t *avcc_au, size_t len, uint64_t
 int fs_send_audio(fake_sender_t *f, const uint8_t *payload, size_t len, uint32_t samples);
 int fs_send_sync(fake_sender_t *f);
 int fs_set_volume(fake_sender_t *f, float db);
+/* SET_PARAMETER with any content type. Returns 0 on a 200 reply. */
+int fs_set_parameter(fake_sender_t *f, const char *content_type, const void *data, size_t len);
+/* Track info (DMAP) and playback position in RTP timestamp units, as a music app sends them. */
+int fs_set_track(fake_sender_t *f, const char *title, const char *artist, const char *album);
+int fs_set_progress(fake_sender_t *f, uint32_t start, uint32_t current, uint32_t end);
+/* One HTTP/1.1 request as the Photos app sends it; headers are "Name: value\r\n" lines or NULL.
+ * Returns the reply status or -1. The reply head goes to reply_head when it is not NULL, the body
+ * to *body (malloc'd) when body is not NULL. */
+int fs_http(fake_sender_t *f, const char *method, const char *url, const char *headers, const void *data,
+            size_t len, char *reply_head, size_t head_cap, uint8_t **body, size_t *body_len);
 int fs_feedback(fake_sender_t *f);
 /* type 0 tears down the whole session. */
 int fs_teardown(fake_sender_t *f, int type);

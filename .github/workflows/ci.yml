@@ -42,7 +42,7 @@ jobs:
 
       - name: Fuzz network parsers (60 s per target)
         run: |
-          for target in bplist rtsp mirror alac server; do
+          for target in bplist rtsp mirror alac dmap server; do
             mkdir -p corpus/$target
             ./build/fuzz/tests/fuzz_$target corpus/$target \
               -max_total_time=60 -timeout=10 -rss_limit_mb=2048 -print_final_stats=1

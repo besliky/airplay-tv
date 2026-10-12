@@ -28,6 +28,7 @@
 #include "audio_rtp.h"
 #include "bplist.h"
 #include "crypto.h"
+#include "dmap.h"
 #include "fairplay.h"
 #include "log.h"
 #include "mirror.h"
@@ -38,15 +39,21 @@
 #include "util.h"
 
 #define MAX_CONNECTIONS 8
-#define RX_LIMIT ((size_t) RTSP_MAX_HEAD + RTSP_MAX_BODY)
+#define RX_LIMIT ((size_t) RTSP_MAX_HEAD + RTSP_MAX_PUT_BODY)
 #define IDLE_TIMEOUT_NS (60 * NS_PER_SEC)
 #define PARTIAL_REQUEST_TIMEOUT_NS (15 * NS_PER_SEC)
 #define SESSION_TIMEOUT_NS (90 * NS_PER_SEC)
 #define PIN_TIMEOUT_NS (120 * NS_PER_SEC)
+#define EVENT_CHANNEL_TIMEOUT_NS (6ull * 3600ull * NS_PER_SEC)
+
+/* Photos the sender may ask to show again by their key (X-Apple-AssetAction: displayCached). */
+#define PHOTO_CACHE_SLOTS 8
+#define PHOTO_CACHE_BYTES ((size_t) 48 * 1024 * 1024)
 
 #define CT_BPLIST "application/x-apple-binary-plist"
 #define CT_OCTET "application/octet-stream"
 #define CT_PARAMS "text/parameters"
+#define CT_DMAP "application/x-dmap-tagged"
 
 #define FEATURES_BASE 0x527FFEE6u     /* UxPlay's mirroring + audio feature set */
 #define FEATURE_LEGACY_PAIRING (1u << 27)
@@ -65,6 +72,7 @@ struct conn {
     uint64_t last_rx_ns;
     uint64_t partial_since_ns;
     bool rtsp;
+    bool event_channel;       /* turned around by POST /reverse; idle for as long as a photo is shown */
     bool close_after_reply;
     bool closing;
     pairing_session_t pair;
@@ -84,8 +92,17 @@ struct session {
     audio_receiver_t *audio;
     char client_name[64];
     char client_model[32];
+    char dacp_id[24];         /* the sender's remote-control service, see note_remote_control() */
+    char active_remote[24];
     _Atomic bool stream_lost;
 };
+
+typedef struct {
+    char key[64];
+    uint8_t *data;
+    size_t len;
+    uint64_t used_ns;
+} photo_t;
 
 struct airplay_server {
     airplay_config_t cfg;
@@ -121,6 +138,10 @@ struct airplay_server {
     pthread_mutex_t paired_lock;
     char **paired;
     int paired_count;
+
+    photo_t photos[PHOTO_CACHE_SLOTS];
+    size_t photo_bytes;
+    bool photo_shown;
 };
 
 /* ------------------------------------------------------------------------- */
@@ -333,6 +354,86 @@ static void session_destroy(airplay_server_t *s, session_t *session) {
 }
 
 /* ------------------------------------------------------------------------- */
+/* photo cache                                                                */
+
+static photo_t *photo_cache_find(airplay_server_t *s, const char *key) {
+    for (int i = 0; i < PHOTO_CACHE_SLOTS; i++) {
+        if (s->photos[i].data && strcmp(s->photos[i].key, key) == 0) {
+            return &s->photos[i];
+        }
+    }
+    return NULL;
+}
+
+static void photo_cache_drop(airplay_server_t *s, photo_t *p) {
+    s->photo_bytes -= p->len;
+    free(p->data);
+    memset(p, 0, sizeof(*p));
+}
+
+static void photo_cache_clear(airplay_server_t *s) {
+    for (int i = 0; i < PHOTO_CACHE_SLOTS; i++) {
+        if (s->photos[i].data) {
+            photo_cache_drop(s, &s->photos[i]);
+        }
+    }
+}
+
+/* Keeps a photo under its key, evicting the least recently used ones to stay within the
+ * limits. Takes ownership of data and returns true, or returns false if it cannot be kept. */
+static bool photo_cache_adopt(airplay_server_t *s, const char *key, uint8_t *data, size_t len) {
+    if (!key[0] || strlen(key) >= sizeof(s->photos[0].key) || len == 0 || len > PHOTO_CACHE_BYTES) {
+        return false;
+    }
+    photo_t *same = photo_cache_find(s, key);
+    if (same) {
+        photo_cache_drop(s, same);
+    }
+    for (;;) {
+        photo_t *slot = NULL;
+        photo_t *oldest = NULL;
+        for (int i = 0; i < PHOTO_CACHE_SLOTS; i++) {
+            photo_t *p = &s->photos[i];
+            if (!p->data) {
+                slot = slot ? slot : p;
+            } else if (!oldest || p->used_ns < oldest->used_ns) {
+                oldest = p;
+            }
+        }
+        if (slot && s->photo_bytes + len <= PHOTO_CACHE_BYTES) {
+            str_copy(slot->key, sizeof(slot->key), key);
+            slot->data = data;
+            slot->len = len;
+            slot->used_ns = time_mono_ns();
+            s->photo_bytes += len;
+            return true;
+        }
+        if (!oldest) {
+            return false;
+        }
+        photo_cache_drop(s, oldest);
+    }
+}
+
+static void photo_show(airplay_server_t *s, const uint8_t *data, size_t len) {
+    s->photo_shown = true;
+    if (s->ev.photo) {
+        s->ev.photo(s->ev.ctx, data, len);
+    }
+}
+
+static void photo_session_end(airplay_server_t *s) {
+    photo_cache_clear(s);
+    if (s->photo_shown) {
+        s->photo_shown = false;
+        LOG_I(AIRPLAY, "photo session ended");
+        if (s->ev.photo_stop) {
+            s->ev.photo_stop(s->ev.ctx);
+        }
+    }
+}
+
+/* ------------------------------------------------------------------------- */
 /* connections                                                                */
 
 static void hide_pin(airplay_server_t *s);
@@ -349,6 +450,10 @@ static void conn_close(airplay_server_t *s, int index) {
     }
     if (c->session) {
         session_destroy(s, c->session);
+    }
+    if (c->event_channel) {
+        /* the Photos app closes its event connection when the user leaves AirPlay */
+        photo_session_end(s);
     }
     net_close(&c->fd);
     pairing_session_clear(&c->pair);
@@ -1009,14 +1114,49 @@ static void handle_get_parameter(airplay_server_t *s, conn_t *c, const rtsp_requ
     }
 }
 
+/* "start/current/end" in RTP timestamp units, each a 32-bit number. */
+static bool parse_progress(const char *text, uint32_t out[3]) {
+    const char *p = text;
+    for (int i = 0; i < 3; i++) {
+        size_t digits = strspn(p, "0123456789");
+        long long v = parse_uint(p, digits, 0xffffffffLL);
+        if (v < 0) {
+            return false;
+        }
+        out[i] = (uint32_t) v;
+        p += digits;
+        if (i < 2 && *p++ != '/') {
+            return false;
+        }
+    }
+    return *p == '\0' || *p == '\r' || *p == '\n';
+}
+
 static void handle_set_parameter(airplay_server_t *s, conn_t *c, const rtsp_request_t *req, rtsp_reply_t *reply) {
     const char *ct = rtsp_header(req, "Content-Type");
     if (!ct) {
         rtsp_reply_status(reply, 451, "Parameter Not Understood");
         return;
     }
+    /* What is playing is only reported for the session on screen, not for one being replaced. */
+    bool active = c->session && c->session == s->active;
+    if (str_ieq(ct, CT_DMAP)) {
+        if (active && s->ev.track_info) {
+            dmap_track_t track;
+            dmap_parse_track(req->body, req->body_len, &track);
+            s->ev.track_info(s->ev.ctx, track.title, track.artist, track.album);
+        }
+        return;
+    }
+    if (strncmp(ct, "image/", 6) == 0) {
+        if (active && s->ev.artwork) {
+            /* senders announce a track without cover with an empty image ("image/none") */
+            s->ev.artwork(s->ev.ctx, req->body_len ? req->body : NULL, req->body_len);
+        }
+        return;
+    }
     if (!str_ieq(ct, CT_PARAMS) || !req->body) {
-        return; /* artwork and DMAP metadata are accepted and ignored */
+        return;
     }
     char text[128];
     size_t n = MIN(req->body_len, sizeof(text) - 1);
@@ -1036,6 +1176,11 @@ static void handle_set_parameter(airplay_server_t *s, conn_t *c, const rtsp_requ
                 s->media->audio_volume(s->media_ctx, db);
             }
             LOG_D(AUDIO, "volume %.1f dB", (double) db);
+        }
+    } else if (strncmp(text, "progress: ", 10) == 0) {
+        uint32_t p[3];
+        if (active && s->ev.progress && parse_progress(text + 10, p)) {
+            s->ev.progress(s->ev.ctx, p[0], p[1], p[2]);
         }
     }
 }
@@ -1086,15 +1231,135 @@ static void handle_teardown(airplay_server_t *s, conn_t *c, const rtsp_request_t
     session_destroy(s, session);
 }
 
-static void handle_request(airplay_server_t *s, conn_t *c, const rtsp_request_t *req, rtsp_reply_t *reply) {
+/* The sender names its remote-control service (_dacp._tcp "iTunes_Ctrl_<DACP-ID>") and the
+ * token commands must carry (Active-Remote) in the headers of its requests. Both end up in a
+ * service name and an HTTP header on the Android side, so only the expected forms pass:
+ * a 64-bit hex number and a 32-bit decimal one. */
+static void note_remote_control(airplay_server_t *s, session_t *session, const rtsp_request_t *req) {
+    const char *id = rtsp_header(req, "DACP-ID");
+    const char *token = rtsp_header(req, "Active-Remote");
+    if (!id || !token) {
+        return;
+    }
+    size_t id_len = strlen(id);
+    size_t token_len = strlen(token);
+    if (id_len == 0 || id_len > 16 || strspn(id, "0123456789abcdefABCDEF") != id_len ||
+        token_len == 0 || token_len > 10 || strspn(token, "0123456789") != token_len) {
+        return;
+    }
+    if (strcmp(id, session->dacp_id) == 0 && strcmp(token, session->active_remote) == 0) {
+        return;
+    }
+    str_copy(session->dacp_id, sizeof(session->dacp_id), id);
+    str_copy(session->active_remote, sizeof(session->active_remote), token);
+    if (s->ev.remote_control) {
+        s->ev.remote_control(s->ev.ctx, session->dacp_id, session->active_remote);
+    }
+}
+
+/* ---- HTTP: photos from the Photos app ---- */
+
+static bool is_jpeg_or_png(const uint8_t *d, size_t n) {
+    static const uint8_t kPng[8] = { 0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n' };
+    return d && ((n >= 3 && d[0] == 0xff && d[1] == 0xd8 && d[2] == 0xff) ||
+                 (n >= sizeof(kPng) && memcmp(d, kPng, sizeof(kPng)) == 0));
+}
+
+static bool path_is(const char *url, const char *path) {
+    size_t n = strlen(path);
+    return strncmp(url, path, n) == 0 && (url[n] == '\0' || url[n] == '?');
+}
+
+static void handle_server_info(airplay_server_t *s, rtsp_reply_t *reply) {
+    char xml[768];
+    int n = snprintf(xml, sizeof(xml),
+                     "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+                     "<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" "
+                     "\"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n"
+                     "<plist version=\"1.0\"><dict>\n"
+                     "<key>deviceid</key><string>%s</string>\n"
+                     "<key>features</key><integer>%llu</integer>\n"
+                     "<key>model</key><string>%s</string>\n"
+                     "<key>protovers</key><string>1.0</string>\n"
+                     "<key>srcvers</key><string>%s</string>\n"
+                     "</dict></plist>\n",
+                     s->device_id_str, (unsigned long long) s->features, AIRPLAY_MODEL, AIRPLAY_SOURCE_VERSION);
+    if (n <= 0 || (size_t) n >= sizeof(xml) ||
+        !rtsp_reply_body_copy(reply, "text/x-apple-plist+xml", xml, (size_t) n)) {
+        rtsp_reply_status(reply, 500, "Internal Server Error");
+    }
+}
+
+/* PUT /photo shows a photo, or with X-Apple-AssetAction keeps it for later (cacheOnly) or shows
+ * one kept before (displayCached). The body is taken over by the cache instead of copied. */
+static void handle_photo(airplay_server_t *s, rtsp_request_t *req, rtsp_reply_t *reply) {
+    const char *key = rtsp_header(req, "X-Apple-AssetKey");
+    const char *action = rtsp_header(req, "X-Apple-AssetAction");
+    if (!key) {
+        key = "";
+    }
+    if (action && str_ieq(action, "displayCached")) {
+        photo_t *p = photo_cache_find(s, key);
+        if (!p) {
+            LOG_I(AIRPLAY, "photo is not cached, the sender will send it again");
+            rtsp_reply_status(reply, 412, "Precondition Failed");
+            return;
+        }
+        p->used_ns = time_mono_ns();
+        photo_show(s, p->data, p->len);
+        return;
+    }
+    if (!is_jpeg_or_png(req->body, req->body_len)) {
+        LOG_W(AIRPLAY, "photo is neither JPEG nor PNG");
+        rtsp_reply_status(reply, 400, "Bad Request");
+        return;
+    }
+    if (!(action && str_ieq(action, "cacheOnly"))) {
+        photo_show(s, req->body, req->body_len);
+    }
+    if (photo_cache_adopt(s, key, req->body, req->body_len)) {
+        req->body = NULL;
+        req->body_len = 0;
+    }
+}
+
+/* The HTTP/1.1 side of AirPlay, on the same port as RTSP. Only photos are offered; AirPlay video
+ * (URL playback) and slideshows are refused and logged, so a refused attempt shows up in the
+ * diagnostics. */
+static void handle_http(airplay_server_t *s, conn_t *c, rtsp_request_t *req, rtsp_reply_t *reply) {
+    const char *m = req->method;
+    const char *url = req->url;
+    if (s->cfg.require_pin && !c->pair_trusted) {
+        LOG_W(AIRPLAY, "HTTP %s %s refused: a PIN is required", m, url);
+        rtsp_reply_status(reply, 403, "Forbidden");
+        reply->close_connection = true;
+    } else if (strcmp(m, "GET") == 0 && path_is(url, "/server-info")) {
+        handle_server_info(s, reply);
+    } else if (strcmp(m, "POST") == 0 && path_is(url, "/reverse")) {
+        /* The sender turns this connection around to receive events. There are none to send, but it
+         * stays open for as long as the photo session lasts, and closing it ends the session. */
+        rtsp_reply_status(reply, 101, "Switching Protocols");
+        rtsp_reply_header(reply, "Upgrade", "PTTH/1.0");
+        rtsp_reply_header(reply, "Connection", "Upgrade");
+        c->event_channel = true;
+    } else if (strcmp(m, "PUT") == 0 && path_is(url, "/photo")) {
+        handle_photo(s, req, reply);
+    } else if (strcmp(m, "POST") == 0 && path_is(url, "/stop")) {
+        photo_session_end(s);
+    } else {
+        LOG_W(AIRPLAY, "HTTP %s %s is not supported", m, url);
+        rtsp_reply_status(reply, 501, "Not Implemented");
+        reply->close_connection = true;
+    }
+}
+
+static void handle_request(airplay_server_t *s, conn_t *c, rtsp_request_t *req, rtsp_reply_t *reply) {
     const char *m = req->method;
     const char *url = req->url;
     bool rtsp = strcmp(req->protocol, "RTSP/1.0") == 0;
 
     if (!rtsp) {
-        /* AirPlay video (HLS/URL playback) is not offered by this receiver. */
-        rtsp_reply_status(reply, 501, "Not Implemented");
-        reply->close_connection = true;
+        handle_http(s, c, req, reply);
         return;
     }
     c->rtsp = true;
@@ -1135,6 +1400,9 @@ static void handle_request(airplay_server_t *s, conn_t *c, const rtsp_request_t 
         handle_teardown(s, c, req, reply);
     } else {
         rtsp_reply_status(reply, 501, "Not Implemented");
+    }
+    if (c->session && c->session == s->active) {
+        note_remote_control(s, c->session, req);
     }
 }
 
@@ -1274,6 +1542,10 @@ static void check_timeouts(airplay_server_t *s, uint64_t now) {
             uint64_t last = MAX(c->last_rx_ns, s->last_media_ns);
             if (now - last > SESSION_TIMEOUT_NS) {
                 LOG_W(SESSION, "sender stopped responding, ending session");
+                close_it = true;
+            }
+        } else if (c->event_channel) {
+            if (now - c->created_ns > EVENT_CHANNEL_TIMEOUT_NS) {
                 close_it = true;
             }
         } else if (now - c->last_rx_ns > IDLE_TIMEOUT_NS) {
@@ -1475,6 +1747,7 @@ void airplay_server_destroy(airplay_server_t *s) {
         return;
     }
     airplay_server_stop(s);
+    photo_cache_clear(s);
     airplay_server_set_paired_clients(s, NULL, 0);
     pthread_mutex_destroy(&s->paired_lock);
     secure_zero(&s->identity, sizeof(s->identity));

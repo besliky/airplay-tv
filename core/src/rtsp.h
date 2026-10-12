@@ -21,6 +21,7 @@
 
 #define RTSP_MAX_HEAD 16384
 #define RTSP_MAX_BODY (2 * 1024 * 1024)
+#define RTSP_MAX_PUT_BODY (16 * 1024 * 1024) /* PUT /photo: a full-size picture from the Photos app */
 #define RTSP_MAX_HEADERS 32
 #define RTSP_MAX_NAME 48
 #define RTSP_MAX_VALUE 640
