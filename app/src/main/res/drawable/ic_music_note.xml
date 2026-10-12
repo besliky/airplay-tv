@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Two beamed eighth notes, shown on a cover placeholder. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M18,12.5L21.5,12V33H18Z M34.5,8.5L38,8V29H34.5Z M18,10.5L38,6V11.5L18,16Z M8,33a6.5,6.5 0,1 1,13 0a6.5,6.5 0,1 1,-13 0Z M24.5,29a6.5,6.5 0,1 1,13 0a6.5,6.5 0,1 1,-13 0Z" />
+</vector>

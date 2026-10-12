@@ -13,7 +13,8 @@
  *
  * The boundary is kept narrow: configuration and control calls go down, a few
  * low-rate events come up. Media never crosses it except for decoded PCM,
- * which the AudioTrack writer pulls in blocks of several milliseconds.
+ * which the AudioTrack writer pulls in blocks of several milliseconds, and
+ * the occasional cover or photo as an encoded image.
  * Strings that can contain arbitrary Unicode travel as UTF-8 byte arrays,
  * because JNI's own string functions use modified UTF-8.
  */
@@ -50,6 +51,12 @@ static struct {
     jmethodID audio_started;
     jmethodID audio_stopped;
     jmethodID volume;
+    jmethodID track_info;
+    jmethodID artwork;
+    jmethodID progress;
+    jmethodID remote_control;
+    jmethodID photo;
+    jmethodID photo_stop;
 } g_cb;
 
 static pthread_mutex_t g_server_lock = PTHREAD_MUTEX_INITIALIZER;
@@ -89,6 +96,26 @@ static jbyteArray utf8_bytes(JNIEnv *env, const char *s) {
     jbyteArray arr = (*env)->NewByteArray(env, len);
     if (arr && len) {
         (*env)->SetByteArrayRegion(env, arr, 0, len, (const jbyte *) s);
+    }
+    return arr;
+}
+
+static void delete_local(JNIEnv *env, jobject ref) {
+    if (ref) {
+        (*env)->DeleteLocalRef(env, ref);
+    }
+}
+
+/* A copy of data as a Java byte array, or NULL if there is none or it cannot be allocated. */
+static jbyteArray byte_array(JNIEnv *env, const uint8_t *data, size_t len) {
+    if (!data || len == 0 || len > 0x7fffffff) {
+        return NULL;
+    }
+    jbyteArray arr = (*env)->NewByteArray(env, (jsize) len);
+    if (arr) {
+        (*env)->SetByteArrayRegion(env, arr, 0, (jsize) len, (const jbyte *) data);
+    } else {
+        (*env)->ExceptionClear(env); /* OutOfMemoryError: drop this one picture */
     }
     return arr;
 }
@@ -200,6 +227,80 @@ static void ev_client_paired(void *ctx, const char *key, const char *name) {
     check_exception(env);
     (*env)->DeleteLocalRef(env, k);
     (*env)->DeleteLocalRef(env, n);
+}
+
+static void ev_track_info(void *ctx, const char *title, const char *artist, const char *album) {
+    (void) ctx;
+    JNIEnv *env = get_env();
+    if (!env) {
+        return;
+    }
+    jbyteArray t = utf8_bytes(env, title);
+    jbyteArray a = utf8_bytes(env, artist);
+    jbyteArray l = utf8_bytes(env, album);
+    (*env)->CallStaticVoidMethod(env, g_bridge, g_cb.track_info, t, a, l);
+    check_exception(env);
+    delete_local(env, t);
+    delete_local(env, a);
+    delete_local(env, l);
+}
+
+static void ev_artwork(void *ctx, const uint8_t *data, size_t len) {
+    (void) ctx;
+    JNIEnv *env = get_env();
+    if (!env) {
+        return;
+    }
+    jbyteArray image = byte_array(env, data, len);
+    if (data && !image) {
+        return; /* too large to hand over: keep the cover that is shown */
+    }
+    (*env)->CallStaticVoidMethod(env, g_bridge, g_cb.artwork, image);
+    check_exception(env);
+    delete_local(env, image);
+}
+
+static void ev_progress(void *ctx, uint32_t start, uint32_t current, uint32_t end) {
+    (void) ctx;
+    JNIEnv *env = get_env();
+    if (env) {
+        (*env)->CallStaticVoidMethod(env, g_bridge, g_cb.progress, (jlong) start, (jlong) current, (jlong) end);
+        check_exception(env);
+    }
+}
+
+static void ev_remote_control(void *ctx, const char *dacp_id, const char *active_remote) {
+    (void) ctx;
+    JNIEnv *env = get_env();
+    if (!env) {
+        return;
+    }
+    jbyteArray d = utf8_bytes(env, dacp_id);
+    jbyteArray a = utf8_bytes(env, active_remote);
+    (*env)->CallStaticVoidMethod(env, g_bridge, g_cb.remote_control, d, a);
+    check_exception(env);
+    delete_local(env, d);
+    delete_local(env, a);
+}
+
+static void ev_photo(void *ctx, const uint8_t *data, size_t len) {
+    (void) ctx;
+    JNIEnv *env = get_env();
+    if (!env) {
+        return;
+    }
+    jbyteArray image = byte_array(env, data, len);
+    if (!image) {
+        return;
+    }
+    (*env)->CallStaticVoidMethod(env, g_bridge, g_cb.photo, image);
+    check_exception(env);
+    delete_local(env, image);
+}
+
+static void ev_photo_stop(void *ctx) {
+    (void) ctx;
+    call_void(g_cb.photo_stop);
 }
 
 /* ------------------------------------------------------------------------- */
@@ -337,6 +438,12 @@ static jint JNICALL n_start(JNIEnv *env, jclass cls, jbyteArray name, jbyteArray
         .session_ended = ev_session_ended,
         .pin_display = ev_pin,
         .client_paired = ev_client_paired,
+        .track_info = ev_track_info,
+        .artwork = ev_artwork,
+        .progress = ev_progress,
+        .remote_control = ev_remote_control,
+        .photo = ev_photo,
+        .photo_stop = ev_photo_stop,
     };
 
     pthread_mutex_lock(&g_server_lock);
@@ -589,6 +696,12 @@ JNIEXPORT jint JNI_OnLoad(JavaVM *vm, void *reserved) {
     g_cb.audio_started = (*env)->GetStaticMethodID(env, g_bridge, "onAudioStarted", "(IIZ)V");
     g_cb.audio_stopped = (*env)->GetStaticMethodID(env, g_bridge, "onAudioStopped", "()V");
     g_cb.volume = (*env)->GetStaticMethodID(env, g_bridge, "onVolume", "(F)V");
+    g_cb.track_info = (*env)->GetStaticMethodID(env, g_bridge, "onTrackInfo", "([B[B[B)V");
+    g_cb.artwork = (*env)->GetStaticMethodID(env, g_bridge, "onArtwork", "([B)V");
+    g_cb.progress = (*env)->GetStaticMethodID(env, g_bridge, "onProgress", "(JJJ)V");
+    g_cb.remote_control = (*env)->GetStaticMethodID(env, g_bridge, "onRemoteControl", "([B[B)V");
+    g_cb.photo = (*env)->GetStaticMethodID(env, g_bridge, "onPhoto", "([B)V");
+    g_cb.photo_stop = (*env)->GetStaticMethodID(env, g_bridge, "onPhotoStop", "()V");
     if ((*env)->ExceptionCheck(env)) {
         (*env)->ExceptionClear(env);
         return JNI_ERR;

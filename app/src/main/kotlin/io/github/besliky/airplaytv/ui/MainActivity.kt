@@ -49,6 +49,9 @@ class MainActivity : SettingsPage() {
             render(ReceiverState.current)
         }
         autoOpenRow = addRow(getString(R.string.setting_auto_open)) { requestAutoOpen() }
+        addRow(getString(R.string.setting_music)) {
+            startActivity(Intent(this, MusicActivity::class.java))
+        }.navigates(true)
         addRow(getString(R.string.setting_advanced)) {
             startActivity(Intent(this, AdvancedActivity::class.java))
         }.navigates(true)

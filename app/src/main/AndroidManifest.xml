@@ -46,6 +46,10 @@
         </activity>
 
         <activity
+            android:name=".ui.MusicActivity"
+            android:exported="false" />
+
+        <activity
             android:name=".ui.AdvancedActivity"
             android:exported="false" />
 
@@ -58,10 +62,40 @@
             android:taskAffinity=".playback"
             android:theme="@style/Theme.AirPlayTV.Mirror" />
 
+        <activity
+            android:name=".ui.NowPlayingActivity"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|uiMode|density"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:taskAffinity=".nowplaying" />
+
+        <activity
+            android:name=".ui.PhotoActivity"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|uiMode|density"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:taskAffinity=".photo"
+            android:theme="@style/Theme.AirPlayTV.Mirror" />
+
         <service
             android:name=".service.ReceiverService"
             android:exported="false"
             android:foregroundServiceType="connectedDevice" />
+
+        <service
+            android:name=".service.SleepService"
+            android:exported="false"
+            android:label="@string/sleep_service_label"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/sleep_service" />
+        </service>
 
         <receiver
             android:name=".service.BootReceiver"

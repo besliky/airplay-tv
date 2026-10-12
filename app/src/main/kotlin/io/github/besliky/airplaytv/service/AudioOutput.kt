@@ -6,7 +6,10 @@ import android.media.AudioFocusRequest
 import android.media.AudioFormat
 import android.media.AudioManager
 import android.media.AudioTrack
+import android.os.Handler
+import android.os.Looper
 import android.os.Process
+import android.os.SystemClock
 import io.github.besliky.airplaytv.Log
 import io.github.besliky.airplaytv.Log.Category.AUDIO
 import io.github.besliky.airplaytv.core.NativeBridge
@@ -18,6 +21,9 @@ import java.nio.ByteBuffer
  * A dedicated thread pulls blocks from the native pipeline and writes them with
  * WRITE_BLOCKING, so the AudioTrack buffer paces the pipeline. Mirroring audio uses a
  * small low-latency buffer, music a larger one that rides out Wi-Fi hiccups.
+ *
+ * Senders do not announce a pause; they stop sending audio. The writer therefore reports when the
+ * audio stops for a moment and when it comes again, see [onFlowChanged].
  */
 class AudioOutput(context: Context) {
 
@@ -25,6 +31,17 @@ class AudioOutput(context: Context) {
     private var track: AudioTrack? = null
     private var thread: Thread? = null
     private var focusRequest: AudioFocusRequest? = null
+    private val main = Handler(Looper.getMainLooper())
+
+    /** Counts output streams, so a report from a writer that has been replaced is dropped. */
+    @Volatile
+    private var stream = 0
+
+    /**
+     * Called on the main thread with false when no audio has come for [PAUSE_MS] and with true when it
+     * comes again, together with the time it stopped or came back (SystemClock.elapsedRealtime).
+     */
+    var onFlowChanged: ((flowing: Boolean, at: Long) -> Unit)? = null
 
     @Volatile
     private var running = false
@@ -83,20 +100,34 @@ class AudioOutput(context: Context) {
         track = t
         requestFocus(attributes)
         running = true
-        thread = Thread({ writerLoop(t) }, "AirPlayAudioOut").apply { start() }
+        val id = ++stream
+        thread = Thread({ writerLoop(t, id) }, "AirPlayAudioOut").apply { start() }
         Log.i(AUDIO, "audio output ${sampleRate}Hz, buffer ${bufferMs}ms${if (lowLatency) ", low latency" else ""}")
     }
 
-    private fun writerLoop(t: AudioTrack) {
+    private fun writerLoop(t: AudioTrack, id: Int) {
         Process.setThreadPriority(Process.THREAD_PRIORITY_URGENT_AUDIO)
         val buffer = ByteBuffer.allocateDirect(8192)
         var playing = false
+        var lastAudioAt = 0L
+        var flowing = true
         try {
             while (running) {
                 buffer.clear()
                 val n = NativeBridge.nativeReadAudio(buffer, buffer.capacity(), 50)
                 if (n < 0) break
-                if (n == 0) continue
+                if (n == 0) {
+                    if (flowing && lastAudioAt > 0 && SystemClock.elapsedRealtime() - lastAudioAt >= PAUSE_MS) {
+                        flowing = false
+                        reportFlow(id, false, lastAudioAt)
+                    }
+                    continue
+                }
+                lastAudioAt = SystemClock.elapsedRealtime()
+                if (!flowing) {
+                    flowing = true
+                    reportFlow(id, true, lastAudioAt)
+                }
                 if (!playing) {
                     t.play()
                     playing = true
@@ -118,6 +149,11 @@ class AudioOutput(context: Context) {
             t.flush()
         } catch (_: IllegalStateException) {
         }
+    }
+
+    private fun reportFlow(id: Int, flowing: Boolean, at: Long) {
+        Log.d(AUDIO, if (flowing) "audio flows again" else "no audio from the sender")
+        main.post { if (id == stream && running) onFlowChanged?.invoke(flowing, at) }
     }
 
     fun setVolume(value: Float) {
@@ -149,5 +185,10 @@ class AudioOutput(context: Context) {
     private fun abandonFocus() {
         focusRequest?.let { audioManager.abandonAudioFocusRequest(it) }
         focusRequest = null
+    }
+
+    private companion object {
+        /** Silence this long from a sender that was playing counts as a pause. */
+        const val PAUSE_MS = 300L
     }
 }

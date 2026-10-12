@@ -69,4 +69,35 @@
     <string name="dialog_diagnostics_title">Diagnostics</string>
     <string name="dialog_diagnostics_saved">Saved to %1$s</string>
     <string name="dialog_decoder_title">Preferred Decoder</string>
+
+    <!-- now playing -->
+    <string name="now_playing_from">Playing from %1$s</string>
+    <string name="lyrics_off">Lyrics are off</string>
+    <string name="lyrics_searching">Looking for lyrics…</string>
+    <string name="lyrics_not_found">No lyrics found</string>
+    <string name="lyrics_instrumental">Instrumental</string>
+    <string name="lyrics_hint">Down for lyrics</string>
+    <string name="lyrics_turn_on">Turn on Lyrics in the AirPlay TV settings</string>
+    <string name="goodnight_countdown">Turning off in %1$s</string>
+
+    <!-- music settings -->
+    <string name="setting_music">Music</string>
+    <string name="music_title">Music</string>
+    <string name="music_hint">When an iPhone plays music to this TV, the TV shows what is playing, and the remote pauses and skips.</string>
+    <string name="setting_lyrics">Lyrics</string>
+    <string name="setting_sleep">Sleep After Music</string>
+    <string name="value_minutes">%1$d min</string>
+    <string name="value_needs_setup">Needs setup</string>
+    <string name="dialog_lyrics_title">Lyrics</string>
+    <string name="dialog_lyrics_message">With Lyrics on, the title and artist of the song that is playing are sent to lrclib.net to find its lyrics. Nothing else leaves this TV.\n\nWhile a song plays, press Down on the remote to see the lyrics, and Up or Back to close them.</string>
+    <string name="dialog_sleep_title">Sleep after music</string>
+    <string name="dialog_sleep_message">When AirPlay turns this TV on and nobody uses the remote, the TV can go back to sleep a few minutes after the music ends.\n\nAndroid allows this only through an accessibility service, which has to be switched on once from a computer:\n\nadb shell settings put secure enabled_accessibility_services %1$s\nadb shell settings put secure accessibility_enabled 1\n\nIf other accessibility services are on already, add this one to the colon-separated list instead. The service does not read the screen.</string>
+    <string name="sleep_service_label" translatable="false">AirPlay TV sleep</string>
+    <string name="sleep_service_description">Lets AirPlay TV put the TV back to sleep after the music. It does not read the screen or see what you do.</string>
+    <string name="setting_remote_volume">Remote Volume Keys</string>
+    <string name="value_tv">TV</string>
+    <string name="value_airplay">AirPlay</string>
+    <string name="dialog_remote_volume_title">Remote volume keys</string>
+    <string name="dialog_remote_volume_message">For streaming sticks whose volume buttons do not change the sound: while something plays over AirPlay, the remote’s volume and mute buttons change the AirPlay volume instead.\n\nLeave this on TV if the buttons already work.</string>
+
 </resources>

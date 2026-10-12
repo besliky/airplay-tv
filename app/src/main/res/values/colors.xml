@@ -10,4 +10,7 @@
     <color name="status_ready">#FF30D158</color>
     <color name="status_warning">#FFFFD60A</color>
     <color name="overlay_background">#B3000000</color>
+    <color name="text_artist">#E6FFFFFF</color>
+    <color name="cover_placeholder">#FF2C2C30</color>
+    <color name="volume_popup">#E62C2C30</color>
 </resources>

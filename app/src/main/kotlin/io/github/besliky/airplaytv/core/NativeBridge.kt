@@ -25,6 +25,23 @@ object NativeBridge {
         fun onAudioStarted(sampleRate: Int, channels: Int, lowLatency: Boolean)
         fun onAudioStopped()
         fun onVolume(gain: Float)
+
+        /** Track info of the active session; empty strings when the sender left a field out. */
+        fun onTrackInfo(title: String, artist: String, album: String)
+
+        /** Encoded cover art (JPEG or PNG), or null when the track has none. */
+        fun onArtwork(image: ByteArray?)
+
+        /** Playback position in RTP timestamp units (unsigned 32-bit values). */
+        fun onProgress(start: Long, current: Long, end: Long)
+
+        /** The sender's remote-control (DACP) service id and the token its commands must carry. */
+        fun onRemoteControl(dacpId: String, activeRemote: String)
+
+        /** An encoded photo (JPEG or PNG) from the sender's Photos app. */
+        fun onPhoto(image: ByteArray)
+
+        fun onPhotoStop()
     }
 
     /** Decoder low-latency options, see video_decoder.h. */
@@ -99,6 +116,33 @@ object NativeBridge {
 
     @JvmStatic
     fun onVolume(gain: Float) = post { it.onVolume(gain) }
+
+    @JvmStatic
+    fun onTrackInfo(title: ByteArray?, artist: ByteArray?, album: ByteArray?) {
+        val t = title.utf8()
+        val a = artist.utf8()
+        val l = album.utf8()
+        post { it.onTrackInfo(t, a, l) }
+    }
+
+    @JvmStatic
+    fun onArtwork(image: ByteArray?) = post { it.onArtwork(image) }
+
+    @JvmStatic
+    fun onProgress(start: Long, current: Long, end: Long) = post { it.onProgress(start, current, end) }
+
+    @JvmStatic
+    fun onRemoteControl(dacpId: ByteArray?, activeRemote: ByteArray?) {
+        val d = dacpId.utf8()
+        val a = activeRemote.utf8()
+        post { it.onRemoteControl(d, a) }
+    }
+
+    @JvmStatic
+    fun onPhoto(image: ByteArray) = post { it.onPhoto(image) }
+
+    @JvmStatic
+    fun onPhotoStop() = post { it.onPhotoStop() }
 
     // ---- native methods ----
 

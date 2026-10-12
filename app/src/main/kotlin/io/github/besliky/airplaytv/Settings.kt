@@ -55,6 +55,21 @@ class Settings(context: Context) {
         get() = if (prefs.getInt(KEY_FPS, 60) == 30) 30 else 60
         set(value) = prefs.edit().putInt(KEY_FPS, if (value == 30) 30 else 60).apply()
 
+    /** Look up lyrics of the playing song on lrclib.net. Off by default: it sends the title and artist. */
+    var lyricsEnabled: Boolean
+        get() = prefs.getBoolean(KEY_LYRICS, false)
+        set(value) = prefs.edit().putBoolean(KEY_LYRICS, value).apply()
+
+    /** Minutes after the music ends until a TV that AirPlay turned on goes back to sleep; 0 is never. */
+    var sleepAfterMinutes: Int
+        get() = prefs.getInt(KEY_SLEEP, 0).takeIf { it in SLEEP_CHOICES } ?: 0
+        set(value) = prefs.edit().putInt(KEY_SLEEP, value.takeIf { it in SLEEP_CHOICES } ?: 0).apply()
+
+    /** The remote's volume buttons change the AirPlay volume, for sticks whose buttons change nothing. */
+    var remoteVolumeKeys: Boolean
+        get() = prefs.getBoolean(KEY_REMOTE_VOLUME, false)
+        set(value) = prefs.edit().putBoolean(KEY_REMOTE_VOLUME, value).apply()
+
     /** Decoder name chosen by the user, empty for automatic selection. */
     var preferredDecoder: String
         get() = prefs.getString(KEY_DECODER, "") ?: ""
@@ -80,6 +95,12 @@ class Settings(context: Context) {
         const val KEY_RESOLUTION = "resolution"
         const val KEY_FPS = "frame_rate"
         const val KEY_DECODER = "preferred_decoder"
+        const val KEY_LYRICS = "lyrics"
+        const val KEY_SLEEP = "sleep_after_minutes"
+        const val KEY_REMOTE_VOLUME = "remote_volume_keys"
+
+        /** The choices for Sleep After Music, in minutes; 0 is off. */
+        val SLEEP_CHOICES = listOf(0, 2, 5, 10, 20)
 
         /** Settings that require the receiver to be restarted when they change. */
         val RESTART_KEYS = setOf(KEY_NAME, KEY_PIN, KEY_RESOLUTION, KEY_FPS, KEY_DECODER)

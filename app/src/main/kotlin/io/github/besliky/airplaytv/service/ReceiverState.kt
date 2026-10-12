@@ -1,5 +1,6 @@
 package io.github.besliky.airplaytv.service
 
+import android.graphics.Bitmap
 import android.os.Handler
 import android.os.Looper
 import java.util.concurrent.CopyOnWriteArraySet
@@ -24,6 +25,12 @@ object ReceiverState {
         val audioActive: Boolean = false,
         val pin: String? = null,
         val error: String? = null,
+        val nowPlaying: NowPlaying = NowPlaying(),
+        /** AirPlay turned the screen on for this session and nobody has used the remote since. */
+        val wokeScreen: Boolean = false,
+        /** The photo shown from the sender's Photos app; [photoSeq] counts the photos received. */
+        val photo: Bitmap? = null,
+        val photoSeq: Int = 0,
     )
 
     private val handler = Handler(Looper.getMainLooper())

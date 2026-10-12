@@ -9,7 +9,6 @@ import android.view.KeyEvent
 import android.view.SurfaceHolder
 import android.view.SurfaceView
 import android.view.View
-import android.view.WindowManager
 import android.widget.FrameLayout
 import android.widget.TextView
 import io.github.besliky.airplaytv.R
@@ -41,7 +40,7 @@ class MirrorActivity : Activity(), SurfaceHolder.Callback {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_mirror)
-        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        showOverStandby()
         settings = Settings(this)
         root = findViewById(R.id.root)
         surface = findViewById(R.id.surface)

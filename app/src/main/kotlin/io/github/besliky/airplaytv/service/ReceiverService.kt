@@ -29,11 +29,14 @@ import io.github.besliky.airplaytv.core.DecoderSelector
 import io.github.besliky.airplaytv.core.NativeBridge
 import io.github.besliky.airplaytv.service.ReceiverState.Status
 import io.github.besliky.airplaytv.ui.MirrorActivity
+import io.github.besliky.airplaytv.ui.NowPlayingActivity
+import io.github.besliky.airplaytv.ui.PhotoActivity
 
 /**
  * Headless AirPlay receiver. Runs as a foreground service for as long as AirPlay is
- * enabled, keeps the services published while a local network is available, and
- * brings up the playback screen when a sender starts mirroring.
+ * enabled, keeps the services published while a local network is available, wakes the
+ * TV when a sender connects, and brings up the playback screen for mirroring, the
+ * Now Playing screen for music and the photo screen for photos.
  *
  * Idle cost: one native thread blocked in poll(), the platform mDNS registration and
  * a network callback. Decoders, audio output and wake locks exist only during a
@@ -46,6 +49,10 @@ class ReceiverService : Service(), NativeBridge.Listener {
     private lateinit var advertiser: Advertiser
     private lateinit var network: NetworkMonitor
     private lateinit var audio: AudioOutput
+    private lateinit var dacp: DacpClient
+    private lateinit var mediaKeys: MediaKeys
+    private lateinit var nowPlaying: NowPlayingTracker
+    private lateinit var remoteVolume: RemoteVolume
     private val handler = Handler(Looper.getMainLooper())
 
     private var running = false
@@ -56,6 +63,7 @@ class ReceiverService : Service(), NativeBridge.Listener {
     private var wifiLock: WifiManager.WifiLock? = null
     private var wakeLock: PowerManager.WakeLock? = null
     private var screenReceiverRegistered = false
+    private var photoToken = 0
 
     private val prefsListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key -> onSettingChanged(key) }
 
@@ -81,6 +89,11 @@ class ReceiverService : Service(), NativeBridge.Listener {
             onPublished = { name -> ReceiverState.update { it.copy(publishedName = name) } }
         }
         audio = AudioOutput(this)
+        dacp = DacpClient(this)
+        mediaKeys = MediaKeys(this, dacp::send)
+        nowPlaying = NowPlayingTracker(settings, audio::setVolume, mediaKeys::update)
+        remoteVolume = RemoteVolume(this, nowPlaying::stepVolume, nowPlaying::toggleMute)
+        audio.onFlowChanged = ::onAudioFlow
         network = NetworkMonitor(this, ::onNetworkChanged)
         network.start()
         settings.registerListener(prefsListener)
@@ -93,6 +106,9 @@ class ReceiverService : Service(), NativeBridge.Listener {
         enterForeground(statusText())
         when (intent?.action) {
             ACTION_DISCONNECT -> NativeBridge.nativeDisconnect()
+            ACTION_REMOTE -> intent.getStringExtra(EXTRA_COMMAND)
+                ?.let { name -> DacpClient.Command.entries.firstOrNull { it.name == name } }
+                ?.let(dacp::send)
             ACTION_RESTART -> when {
                 !settings.enabled -> shutdown()
                 ReceiverState.current.clientName != null -> restartPending = true
@@ -117,6 +133,9 @@ class ReceiverService : Service(), NativeBridge.Listener {
             screenReceiverRegistered = false
         }
         if (NativeBridge.listener === this) NativeBridge.listener = null
+        remoteVolume.stop()
+        mediaKeys.stop()
+        dacp.shutdown()
         handler.removeCallbacksAndMessages(null)
         ReceiverState.update { it.copy(status = Status.OFF) }
         super.onDestroy()
@@ -194,9 +213,10 @@ class ReceiverService : Service(), NativeBridge.Listener {
         releaseSessionLocks()
         releaseMulticastLock()
         Notifications.cancelSessionPrompt(this)
+        photoToken++
         ReceiverState.update {
             it.copy(status = Status.OFF, publishedName = "", clientName = null, clientModel = null,
-                videoActive = false, audioActive = false, pin = null, port = 0)
+                videoActive = false, audioActive = false, pin = null, port = 0, photo = null)
         }
     }
 
@@ -293,6 +313,8 @@ class ReceiverService : Service(), NativeBridge.Listener {
         when (key) {
             Settings.KEY_ENABLED -> if (settings.enabled) startReceiver() else shutdown()
             Settings.KEY_VERBOSE -> applyLogLevel()
+            Settings.KEY_LYRICS -> nowPlaying.lyricsSettingChanged()
+            Settings.KEY_REMOTE_VOLUME -> if (ReceiverState.current.clientName != null) applyRemoteVolume()
             in Settings.RESTART_KEYS -> {
                 if (ReceiverState.current.clientName != null) {
                     restartPending = true
@@ -353,21 +375,61 @@ class ReceiverService : Service(), NativeBridge.Listener {
         wifiLock = null
     }
 
-    // ---- playback screen ----
+    // ---- screens ----
+
+    /**
+     * Turns the screen on if it is off (a TV in standby with the network up). On a streaming stick
+     * the TV follows over HDMI-CEC, so the picture is seen and the music heard, as with a TV that has
+     * AirPlay built in. The playback screens keep the screen on afterwards.
+     */
+    @Suppress("DEPRECATION") // the only way for a service to turn the screen on
+    private fun wakeScreen() {
+        val power = getSystemService(Context.POWER_SERVICE) as PowerManager
+        if (power.isInteractive) return
+        Log.i(SESSION, "turning the screen on")
+        ReceiverState.update { it.copy(wokeScreen = true) }
+        try {
+            power.newWakeLock(PowerManager.SCREEN_BRIGHT_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP, "airplaytv:wake")
+                .acquire(WAKE_MS)
+        } catch (e: RuntimeException) {
+            Log.w(SESSION, "cannot turn the screen on", e)
+        }
+    }
+
+    private fun open(activity: Class<*>) {
+        try {
+            startActivity(Intent(this, activity).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP))
+        } catch (e: RuntimeException) {
+            Log.w(SESSION, "cannot open ${activity.simpleName}", e)
+        }
+    }
 
     private fun showPlayback() {
-        val intent = Intent(this, MirrorActivity::class.java)
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        wakeScreen()
         val allowed = Build.VERSION.SDK_INT < 29 || canDrawOverlays(this) || App.isInForeground
-        try {
-            startActivity(intent)
-        } catch (e: RuntimeException) {
-            Log.w(SESSION, "cannot open the playback screen", e)
-        }
+        open(MirrorActivity::class.java)
         if (!allowed) {
             Log.w(SESSION, "opening the playback screen needs the \"display over other apps\" permission")
             Notifications.showSessionPrompt(this, ReceiverState.current.clientName ?: "iPhone")
         }
+    }
+
+    /** Music from an audio-only sender: show what is playing. */
+    private fun showNowPlaying() {
+        if (ReceiverState.current.videoActive) return
+        wakeScreen()
+        open(NowPlayingActivity::class.java)
+    }
+
+    private fun applyRemoteVolume() {
+        if (settings.remoteVolumeKeys) remoteVolume.start() else remoteVolume.stop()
+    }
+
+    private fun onAudioFlow(flowing: Boolean, at: Long) {
+        nowPlaying.onAudioFlow(flowing, at)
+        // Music comes back after a long pause in which the screen went to sleep: show it again.
+        val power = getSystemService(Context.POWER_SERVICE) as PowerManager
+        if (flowing && !power.isInteractive) showNowPlaying()
     }
 
     // ---- native events (main thread) ----
@@ -376,14 +438,21 @@ class ReceiverService : Service(), NativeBridge.Listener {
         Log.i(SESSION, "session started ($clientModel)")
         acquireSessionLocks()
         ReceiverState.update {
-            it.copy(status = Status.CONNECTED, clientName = clientName, clientModel = clientModel, pin = null)
+            it.copy(status = Status.CONNECTED, clientName = clientName, clientModel = clientModel, pin = null, wokeScreen = false)
         }
+        nowPlaying.sessionStarted()
+        applyRemoteVolume()
+        wakeScreen()
         enterForeground(statusText())
     }
 
     override fun onSessionEnded() {
         Log.i(SESSION, "session ended")
         audio.stop()
+        remoteVolume.stop()
+        mediaKeys.stop()
+        dacp.clear()
+        nowPlaying.sessionEnded()
         releaseSessionLocks()
         Notifications.cancelSessionPrompt(this)
         ReceiverState.update {
@@ -420,6 +489,11 @@ class ReceiverService : Service(), NativeBridge.Listener {
     override fun onAudioStarted(sampleRate: Int, channels: Int, lowLatency: Boolean) {
         audio.start(sampleRate, channels, lowLatency)
         ReceiverState.update { it.copy(audioActive = true) }
+        nowPlaying.audioStarted(sampleRate)
+        mediaKeys.start()
+        mediaKeys.update(ReceiverState.current.nowPlaying)
+        // Low-latency audio belongs to mirroring, which has its own screen.
+        if (!lowLatency) showNowPlaying()
     }
 
     override fun onAudioStopped() {
@@ -427,15 +501,45 @@ class ReceiverService : Service(), NativeBridge.Listener {
         ReceiverState.update { it.copy(audioActive = false) }
     }
 
-    override fun onVolume(gain: Float) {
-        audio.setVolume(gain)
+    override fun onVolume(gain: Float) = nowPlaying.onSenderVolume(gain)
+
+    override fun onTrackInfo(title: String, artist: String, album: String) = nowPlaying.onTrackInfo(title, artist, album)
+
+    override fun onArtwork(image: ByteArray?) = nowPlaying.onArtwork(image)
+
+    override fun onProgress(start: Long, current: Long, end: Long) = nowPlaying.onProgress(start, current, end)
+
+    override fun onRemoteControl(dacpId: String, activeRemote: String) = dacp.configure(dacpId, activeRemote)
+
+    override fun onPhoto(image: ByteArray) {
+        // A big photo takes a moment to decode; one that is done after a newer photo or after the end
+        // of the photo session is dropped.
+        val token = ++photoToken
+        Images.decode(image, Images.PHOTO_SIDE) { bitmap ->
+            if (token != photoToken) return@decode
+            if (bitmap == null) {
+                Log.w(SESSION, "cannot decode the photo")
+                return@decode
+            }
+            ReceiverState.update { it.copy(photo = bitmap, photoSeq = it.photoSeq + 1) }
+            wakeScreen()
+            open(PhotoActivity::class.java)
+        }
+    }
+
+    override fun onPhotoStop() {
+        photoToken++
+        ReceiverState.update { it.copy(photo = null) }
     }
 
     companion object {
         const val ACTION_STOP = "io.github.besliky.airplaytv.STOP"
         const val ACTION_DISCONNECT = "io.github.besliky.airplaytv.DISCONNECT"
         const val ACTION_RESTART = "io.github.besliky.airplaytv.RESTART"
+        private const val ACTION_REMOTE = "io.github.besliky.airplaytv.REMOTE"
+        private const val EXTRA_COMMAND = "command"
         private const val DEFAULT_PORT = 7000
+        private const val WAKE_MS = 3_000L
 
         fun start(context: Context) {
             try {
@@ -451,6 +555,17 @@ class ReceiverService : Service(), NativeBridge.Listener {
                 context.startForegroundService(Intent(context, ReceiverService::class.java).setAction(ACTION_RESTART))
             } catch (e: RuntimeException) {
                 Log.e(SERVICE, "cannot restart the receiver service", e)
+            }
+        }
+
+        /** Sends a transport command to the sender, e.g. from the remote on the Now Playing screen. */
+        fun sendRemoteCommand(context: Context, command: DacpClient.Command) {
+            try {
+                context.startService(
+                    Intent(context, ReceiverService::class.java).setAction(ACTION_REMOTE).putExtra(EXTRA_COMMAND, command.name),
+                )
+            } catch (e: RuntimeException) {
+                Log.w(SESSION, "cannot send the remote command", e)
             }
         }
 
