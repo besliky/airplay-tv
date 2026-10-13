@@ -27,9 +27,10 @@ import io.github.besliky.airplaytv.R
 import io.github.besliky.airplaytv.Settings
 import io.github.besliky.airplaytv.core.DecoderSelector
 import io.github.besliky.airplaytv.core.NativeBridge
+import io.github.besliky.airplaytv.core.StreamSize
 import io.github.besliky.airplaytv.service.ReceiverState.Status
-import io.github.besliky.airplaytv.ui.MirrorActivity
-import io.github.besliky.airplaytv.ui.NowPlayingActivity
+import io.github.besliky.airplaytv.ui.Page
+import io.github.besliky.airplaytv.ui.Pages
 import io.github.besliky.airplaytv.ui.PhotoActivity
 
 /**
@@ -233,6 +234,12 @@ class ReceiverService : Service(), NativeBridge.Listener {
         var res = settings.resolution
         if (res == Settings.Resolution.UHD && !selection.hevc4k) res = Settings.Resolution.FULL_HD
         val display = getSystemService(DisplayManager::class.java)?.getDisplay(Display.DEFAULT_DISPLAY)
+        if (BuildConfig.CAR) {
+            // Head units come in every shape; the phone's picture should fill the panel, not a 16:9 box.
+            val maxLong = if (res == Settings.Resolution.HD) Settings.Resolution.HD.width else Settings.Resolution.FULL_HD.width
+            val (w, h) = StreamSize.fit(display?.mode?.physicalWidth ?: 0, display?.mode?.physicalHeight ?: 0, maxLong)
+            return Mode(w, h, hevc = false)
+        }
         val physical = display?.mode?.let { maxOf(it.physicalWidth, it.physicalHeight) } ?: 1920
         if (physical in 1..1280 && res != Settings.Resolution.HD) res = Settings.Resolution.HD
         if (physical in 1281..1920 && res == Settings.Resolution.UHD) res = Settings.Resolution.FULL_HD
@@ -396,18 +403,22 @@ class ReceiverService : Service(), NativeBridge.Listener {
         }
     }
 
-    private fun open(activity: Class<*>) {
+    private fun open(activity: Class<*>) = open(Intent(this, activity))
+
+    private fun open(page: Page) = open(Pages.intent(this, page))
+
+    private fun open(intent: Intent) {
         try {
-            startActivity(Intent(this, activity).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP))
+            startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP))
         } catch (e: RuntimeException) {
-            Log.w(SESSION, "cannot open ${activity.simpleName}", e)
+            Log.w(SESSION, "cannot open ${intent.component?.shortClassName}", e)
         }
     }
 
     private fun showPlayback() {
         wakeScreen()
         val allowed = Build.VERSION.SDK_INT < 29 || canDrawOverlays(this) || App.isInForeground
-        open(MirrorActivity::class.java)
+        open(Page.MIRROR)
         if (!allowed) {
             Log.w(SESSION, "opening the playback screen needs the \"display over other apps\" permission")
             Notifications.showSessionPrompt(this, ReceiverState.current.clientName ?: "iPhone")
@@ -418,7 +429,7 @@ class ReceiverService : Service(), NativeBridge.Listener {
     private fun showNowPlaying() {
         if (ReceiverState.current.videoActive) return
         wakeScreen()
-        open(NowPlayingActivity::class.java)
+        open(Page.MUSIC)
     }
 
     private fun applyRemoteVolume() {

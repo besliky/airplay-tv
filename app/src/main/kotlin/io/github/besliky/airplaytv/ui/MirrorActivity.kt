@@ -2,8 +2,6 @@ package io.github.besliky.airplaytv.ui
 
 import android.app.Activity
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.view.Gravity
 import android.view.KeyEvent
 import android.view.SurfaceHolder
@@ -32,8 +30,7 @@ class MirrorActivity : Activity(), SurfaceHolder.Callback {
     private lateinit var overlay: TextView
     private lateinit var settings: Settings
 
-    private val handler = Handler(Looper.getMainLooper())
-    private var overlayStats: OverlayStats? = null
+    private lateinit var performance: PerformanceOverlay
 
     private val stateListener: (ReceiverState.Snapshot) -> Unit = { render(it) }
 
@@ -49,6 +46,7 @@ class MirrorActivity : Activity(), SurfaceHolder.Callback {
         standbyInfo = findViewById(R.id.standbyInfo)
         pinView = findViewById(R.id.pin)
         overlay = findViewById(R.id.overlay)
+        performance = PerformanceOverlay(overlay)
         surface.holder.addCallback(this)
         root.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> layoutSurface(ReceiverState.current) }
     }
@@ -56,18 +54,12 @@ class MirrorActivity : Activity(), SurfaceHolder.Callback {
     override fun onStart() {
         super.onStart()
         ReceiverState.observe(stateListener)
-        if (settings.performanceOverlay) {
-            overlay.visibility = View.VISIBLE
-            overlayStats = OverlayStats().also { handler.post(overlayTick) }
-        } else {
-            overlay.visibility = View.GONE
-        }
+        performance.show(settings.performanceOverlay)
     }
 
     override fun onStop() {
         ReceiverState.remove(stateListener)
-        handler.removeCallbacks(overlayTick)
-        overlayStats = null
+        performance.show(false)
         super.onStop()
     }
 
@@ -144,53 +136,5 @@ class MirrorActivity : Activity(), SurfaceHolder.Callback {
             return true
         }
         return super.onKeyDown(keyCode, event)
-    }
-
-    // ---- performance overlay ----
-
-    private class OverlayStats {
-        val previous = LongArray(STATS_SIZE)
-        val current = LongArray(STATS_SIZE)
-        var lastTime = 0L
-    }
-
-    private val overlayTick = object : Runnable {
-        override fun run() {
-            val stats = overlayStats ?: return
-            if (NativeBridge.loaded) {
-                NativeBridge.nativeStats(stats.current)
-                val now = System.nanoTime()
-                if (stats.lastTime != 0L) {
-                    overlay.text = formatStats(stats.previous, stats.current, (now - stats.lastTime) / 1e9)
-                }
-                stats.current.copyInto(stats.previous)
-                stats.lastTime = now
-            }
-            handler.postDelayed(this, 1000)
-        }
-    }
-
-    private fun formatStats(a: LongArray, b: LongArray, seconds: Double): String {
-        fun rate(i: Int) = (b[i] - a[i]) / seconds
-        fun avg(total: Int, count: Int): Double {
-            val n = b[count] - a[count]
-            return if (n > 0) (b[total] - a[total]) / n.toDouble() / 1000.0 else 0.0
-        }
-        val codec = when (b[12]) { 1L -> "H.264"; 2L -> "H.265"; else -> "—" }
-        val audio = when (b[19]) { 2L -> "ALAC"; 4L -> "AAC-LC"; 8L -> "AAC-ELD"; else -> "—" }
-        return buildString {
-            append("video   %s %dx%d\n".format(codec, b[10], b[11]))
-            append("in      %5.1f fps  %5.2f Mbit/s\n".format(rate(0), rate(1) * 8 / 1e6))
-            append("shown   %5.1f fps  dropped %d\n".format(rate(4), b[5]))
-            append("decode  %5.1f ms\n".format(avg(6, 7)))
-            if (b[22] != 0L) append("delay   %5.1f ms (sender to decoder)\n".format(avg(8, 9)))
-            append("resets  %d  keyframes %d\n".format(b[13], b[2]))
-            append("audio   %s  buffer %d ms\n".format(audio, b[20]))
-            append("packets %d lost  %d dropped frames".format(b[15], b[18]))
-        }
-    }
-
-    companion object {
-        private const val STATS_SIZE = 25
     }
 }

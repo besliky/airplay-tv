@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- the car app's wording of strings from src/main -->
+    <string name="app_name" translatable="false">AirPlay Car</string>
+    <string name="hint_no_network">Join your iPhone’s Personal Hotspot in the Wi‑Fi settings</string>
+    <string name="dialog_overlay_message">To show your iPhone’s screen as soon as mirroring starts, allow AirPlay Car to display over other apps.\n\nThis head unit does not offer that setting in its menus. It can be enabled once from a computer:\n\nadb shell appops set %1$s SYSTEM_ALERT_WINDOW allow</string>
+    <string name="update_up_to_date">AirPlay Car %1$s is the latest version.</string>
+    <string name="update_available_title">AirPlay Car %1$s</string>
+    <string name="update_failed_network">GitHub could not be reached. Check that the head unit has internet (for example through the iPhone’s hotspot) and try again.</string>
+    <string name="update_failed_no_apk">This release has no package for this head unit (%1$s).</string>
+    <string name="update_allow_message">To install updates, allow AirPlay Car to install apps on the next screen. The update continues when you come back.</string>
+
+    <!-- dock -->
+    <string name="car_home">Home</string>
+    <string name="car_phone_screen">iPhone screen</string>
+    <string name="car_now_playing">Now Playing</string>
+    <string name="car_settings">Settings</string>
+    <string name="car_network">Network</string>
+
+    <!-- home -->
+    <string name="car_nothing_playing">Nothing playing</string>
+    <string name="car_nothing_playing_hint">On iPhone, tap AirPlay and choose “%1$s”</string>
+    <string name="car_ready">Ready as “%1$s”</string>
+    <string name="car_ready_detail">On iPhone: Control Center → Screen Mirroring → %1$s</string>
+    <string name="car_no_network">No Wi‑Fi</string>
+    <string name="car_no_network_detail">Turn on Personal Hotspot on your iPhone and join it here once. The head unit joins it again by itself on every drive.</string>
+    <string name="car_off">AirPlay is off</string>
+    <string name="car_off_detail">Turn it on in Settings.</string>
+    <string name="car_error_detail">The receiver could not start. Restart the head unit or export diagnostics in Settings → Advanced.</string>
+    <string name="car_connected">%1$s is connected</string>
+    <string name="car_mirroring_detail">Mirroring the screen. Siri and the steering wheel buttons work as usual.</string>
+    <string name="car_music_detail">Playing music over AirPlay.</string>
+    <string name="car_starting">Starting…</string>
+    <string name="car_network_wifi">Wi‑Fi · %1$s</string>
+    <string name="car_action_setup">How to connect</string>
+    <string name="car_action_wifi">Wi‑Fi Settings</string>
+    <string name="car_action_show">Show Screen</string>
+    <string name="car_action_disconnect">Disconnect</string>
+    <string name="car_action_settings">Settings</string>
+    <string name="car_action_allow">Allow Auto Open</string>
+
+    <!-- music and mirroring -->
+    <string name="car_previous">Previous track</string>
+    <string name="car_next">Next track</string>
+    <string name="car_play_pause">Play or pause</string>
+    <string name="car_stop_mirroring">Stop Mirroring</string>
+    <string name="car_mirroring_from">Screen of %1$s</string>
+    <string name="car_waiting_for">Waiting for %1$s…</string>
+
+    <!-- setup guide -->
+    <string name="car_setup_title">Connect your iPhone</string>
+    <string name="car_setup_1_title">Turn on Personal Hotspot</string>
+    <string name="car_setup_1_text">On the iPhone: Settings → Personal Hotspot → Allow Others to Join. Keep it on; the iPhone uses almost no power for it while nothing is connected.</string>
+    <string name="car_setup_2_title">Join it from the head unit</string>
+    <string name="car_setup_2_text">Choose your iPhone in the head unit’s Wi‑Fi list and enter the hotspot password. From then on the head unit joins it by itself when the car starts, and it gets internet for maps and updates.</string>
+    <string name="car_setup_3_title">Let the picture open by itself</string>
+    <string name="car_setup_3_text">Allow AirPlay Car to display over other apps, so the iPhone’s screen appears as soon as you start mirroring, whatever is on the head unit.</string>
+    <string name="car_setup_4_title">Mirror or play</string>
+    <string name="car_setup_4_text">Screen: Control Center → Screen Mirroring → %1$s. Music only: the AirPlay button in any player → %1$s. The iPhone remembers the choice for the next drive.</string>
+    <string name="car_setup_maps_title">Maps and navigation</string>
+    <string name="car_setup_maps_text">Turn off Portrait Orientation Lock in Control Center: navigators that turn sideways, such as Yandex Navigator, Google Maps and 2GIS, then fill the whole screen. Upright, the map stands next to the dock at full height. Keep the iPhone on a charger; navigators keep it unlocked by themselves, and their voice comes through the car’s speakers.</string>
+    <string name="car_setup_5_title">Music starts by itself (optional)</string>
+    <string name="car_setup_5_text">In the Shortcuts app: Automation → New → Bluetooth → your car (or Wi‑Fi) → action “Set Playback Destination” → %1$s, then “Play/Pause” → Play. Turn off “Ask Before Running”.</string>
+    <string name="car_setup_tip_title">Good to know</string>
+    <string name="car_setup_tip_text">Touches on the head unit do not reach the iPhone: Apple’s screen mirroring carries the picture and sound only. Use Siri, the iPhone itself, or the controls here and on the steering wheel, which pause and skip the music.</string>
+    <string name="car_setup_wifi">Open Wi‑Fi Settings</string>
+    <string name="car_setup_allow">Allow</string>
+    <string name="car_setup_allowed">Allowed</string>
+</resources>

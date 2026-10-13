@@ -39,6 +39,9 @@
     <string name="value_allowed">Allowed</string>
     <string name="value_allow">Allow</string>
     <string name="value_automatic">Automatic</string>
+    <string name="setting_dock_side">Dock Side</string>
+    <string name="value_left">Left</string>
+    <string name="value_right">Right</string>
 
     <string name="advanced_title">Advanced</string>
     <string name="setting_decoder">Preferred Decoder</string>

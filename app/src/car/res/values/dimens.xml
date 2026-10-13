@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- tuned for head units of about 480 dp in height (1280x720 at 240 dpi, 1024x600 at 200 dpi) -->
+    <dimen name="car_dock_width">88dp</dimen>
+    <dimen name="car_page_padding">16dp</dimen>
+    <dimen name="car_home_clock">56sp</dimen>
+    <dimen name="car_home_cover">112dp</dimen>
+    <dimen name="car_music_padding">28dp</dimen>
+    <dimen name="car_music_cover_max">360dp</dimen>
+    <dimen name="car_music_title">30sp</dimen>
+    <dimen name="car_play_size">88dp</dimen>
+    <dimen name="car_side_clock">52sp</dimen>
+    <dimen name="car_side_min_width">240dp</dimen>
+    <dimen name="car_side_max_width">380dp</dimen>
+</resources>

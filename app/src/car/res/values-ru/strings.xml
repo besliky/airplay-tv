@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- the car app's wording of strings from src/main -->
+    <string name="hint_no_network">Подключитесь к режиму модема iPhone в настройках Wi‑Fi</string>
+    <string name="dialog_overlay_message">Чтобы экран iPhone появлялся сразу после начала повтора, разрешите AirPlay Car показываться поверх других приложений.\n\nВ меню этой магнитолы такой настройки нет. Её можно один раз включить с компьютера:\n\nadb shell appops set %1$s SYSTEM_ALERT_WINDOW allow</string>
+    <string name="update_up_to_date">AirPlay Car %1$s — последняя версия.</string>
+    <string name="update_available_title">AirPlay Car %1$s</string>
+    <string name="update_failed_network">Нет связи с GitHub. Проверьте, что у магнитолы есть интернет (например, через режим модема iPhone), и попробуйте снова.</string>
+    <string name="update_failed_no_apk">В этом выпуске нет пакета для этой магнитолы (%1$s).</string>
+    <string name="update_allow_message">Чтобы ставить обновления, разрешите AirPlay Car устанавливать приложения на следующем экране. Обновление продолжится, когда вы вернётесь.</string>
+
+    <!-- dock -->
+    <string name="car_home">Домой</string>
+    <string name="car_phone_screen">Экран iPhone</string>
+    <string name="car_now_playing">Сейчас играет</string>
+    <string name="car_settings">Настройки</string>
+    <string name="car_network">Сеть</string>
+
+    <!-- home -->
+    <string name="car_nothing_playing">Ничего не играет</string>
+    <string name="car_nothing_playing_hint">На iPhone нажмите AirPlay и выберите «%1$s»</string>
+    <string name="car_ready">Готов как «%1$s»</string>
+    <string name="car_ready_detail">На iPhone: Пункт управления → Повтор экрана → %1$s</string>
+    <string name="car_no_network">Нет Wi‑Fi</string>
+    <string name="car_no_network_detail">Включите режим модема на iPhone и один раз подключитесь к нему здесь. Дальше магнитола будет подключаться сама в каждой поездке.</string>
+    <string name="car_off">AirPlay выключен</string>
+    <string name="car_off_detail">Включите его в настройках.</string>
+    <string name="car_error_detail">Приёмник не запустился. Перезапустите магнитолу или сохраните диагностику: Настройки → Дополнительно.</string>
+    <string name="car_connected">%1$s подключён</string>
+    <string name="car_mirroring_detail">Идёт повтор экрана. Siri и кнопки на руле работают как обычно.</string>
+    <string name="car_music_detail">Играет музыка по AirPlay.</string>
+    <string name="car_starting">Запуск…</string>
+    <string name="car_network_wifi">Wi‑Fi · %1$s</string>
+    <string name="car_action_setup">Как подключить</string>
+    <string name="car_action_wifi">Настройки Wi‑Fi</string>
+    <string name="car_action_show">Показать экран</string>
+    <string name="car_action_disconnect">Отключить</string>
+    <string name="car_action_settings">Настройки</string>
+    <string name="car_action_allow">Разрешить автооткрытие</string>
+
+    <!-- music and mirroring -->
+    <string name="car_previous">Предыдущий трек</string>
+    <string name="car_next">Следующий трек</string>
+    <string name="car_play_pause">Пауза или воспроизведение</string>
+    <string name="car_stop_mirroring">Остановить повтор</string>
+    <string name="car_mirroring_from">Экран: %1$s</string>
+    <string name="car_waiting_for">Ожидание %1$s…</string>
+
+    <!-- setup guide -->
+    <string name="car_setup_title">Подключение iPhone</string>
+    <string name="car_setup_1_title">Включите режим модема</string>
+    <string name="car_setup_1_text">На iPhone: Настройки → Режим модема → Разрешать другим. Оставьте включённым: пока никто не подключён, iPhone почти не тратит на это заряд.</string>
+    <string name="car_setup_2_title">Подключите к нему магнитолу</string>
+    <string name="car_setup_2_text">Выберите свой iPhone в списке Wi‑Fi магнитолы и введите пароль точки доступа. Дальше магнитола сама подключается к нему при запуске машины, а заодно получает интернет для карт и обновлений.</string>
+    <string name="car_setup_3_title">Пусть картинка открывается сама</string>
+    <string name="car_setup_3_text">Разрешите AirPlay Car показываться поверх других приложений — тогда экран iPhone появится сразу, что бы ни было открыто на магнитоле.</string>
+    <string name="car_setup_4_title">Повтор экрана или музыка</string>
+    <string name="car_setup_4_text">Экран: Пункт управления → Повтор экрана → %1$s. Только музыка: кнопка AirPlay в любом плеере → %1$s. iPhone запомнит выбор до следующей поездки.</string>
+    <string name="car_setup_maps_title">Карты и навигация</string>
+    <string name="car_setup_maps_text">Выключите блокировку книжной ориентации в Пункте управления: навигаторы, которые умеют поворачиваться (Яндекс Навигатор, Google Maps, 2ГИС), займут весь экран. Вертикальная карта встаёт рядом с доком во всю высоту. Держите iPhone на зарядке; навигаторы сами не дают ему заблокироваться, а их подсказки звучат через динамики машины.</string>
+    <string name="car_setup_5_title">Музыка включается сама (по желанию)</string>
+    <string name="car_setup_5_text">В приложении «Команды»: Автоматизация → Новая → Bluetooth → ваша машина (или Wi‑Fi) → действие «Задать место воспроизведения» → %1$s, затем «Воспроизведение/пауза» → Воспроизвести. Выключите «Спрашивать до запуска».</string>
+    <string name="car_setup_tip_title">Полезно знать</string>
+    <string name="car_setup_tip_text">Касания экрана магнитолы не доходят до iPhone: повтор экрана Apple передаёт только картинку и звук. Пользуйтесь Siri, самим iPhone или кнопками здесь и на руле — они ставят музыку на паузу и переключают треки.</string>
+    <string name="car_setup_wifi">Открыть настройки Wi‑Fi</string>
+    <string name="car_setup_allow">Разрешить</string>
+    <string name="car_setup_allowed">Разрешено</string>
+</resources>

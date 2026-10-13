@@ -17,6 +17,8 @@ import io.github.besliky.airplaytv.service.ArtworkColors
 import io.github.besliky.airplaytv.service.NowPlaying
 import io.github.besliky.airplaytv.service.ReceiverState
 import io.github.besliky.airplaytv.ui.NowPlayingActivity
+import io.github.besliky.airplaytv.ui.Page
+import io.github.besliky.airplaytv.ui.Pages
 import io.github.besliky.airplaytv.ui.PhotoActivity
 
 /**
@@ -24,6 +26,7 @@ import io.github.besliky.airplaytv.ui.PhotoActivity
  *
  *     adb shell am start -n io.github.besliky.airplaytv/.PreviewActivity --es show now
  *
+ * In the car app it opens the music page of the car shell (`io.github.besliky.airplaytv.car/...`).
  * `show` is one of now, pause, lyrics, dim, ambient, blank, goodnight, volume, next, previous,
  * photo and photo2. Nothing is sent over the network. The receiver's real state is put back when
  * the preview is left with Back.
@@ -56,6 +59,10 @@ class PreviewActivity : Activity() {
             "volume" -> later(3000) { ReceiverState.update { it.copy(nowPlaying = it.nowPlaying.copy(volume = 0.35f, volumeSeq = it.nowPlaying.volumeSeq + 1)) } }
             "next" -> later(6000) { change(tracks[1], 1) }
             "previous" -> later(6000) { change(tracks[2], -1) }
+        }
+        if (BuildConfig.CAR) {
+            startActivity(Pages.intent(this, Page.MUSIC).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            return
         }
         startActivity(Intent(this, NowPlayingActivity::class.java).putExtra(NowPlayingActivity.EXTRA_PREVIEW, show))
     }

@@ -70,6 +70,11 @@ class Settings(context: Context) {
         get() = prefs.getBoolean(KEY_REMOTE_VOLUME, false)
         set(value) = prefs.edit().putBoolean(KEY_REMOTE_VOLUME, value).apply()
 
+    /** Car app: the dock is on the right, for right-hand-drive cars. */
+    var dockOnRight: Boolean
+        get() = prefs.getBoolean(KEY_DOCK_RIGHT, false)
+        set(value) = prefs.edit().putBoolean(KEY_DOCK_RIGHT, value).apply()
+
     /** Decoder name chosen by the user, empty for automatic selection. */
     var preferredDecoder: String
         get() = prefs.getString(KEY_DECODER, "") ?: ""
@@ -82,7 +87,8 @@ class Settings(context: Context) {
         prefs.unregisterOnSharedPreferenceChangeListener(l)
 
     companion object {
-        const val DEFAULT_NAME = "AirPlay TV"
+        /** "AirPlay TV" or "AirPlay Car". */
+        val DEFAULT_NAME: String = BuildConfig.DEFAULT_DEVICE_NAME
         const val MAX_NAME_LENGTH = 40
 
         const val KEY_NAME = "device_name"
@@ -98,6 +104,7 @@ class Settings(context: Context) {
         const val KEY_LYRICS = "lyrics"
         const val KEY_SLEEP = "sleep_after_minutes"
         const val KEY_REMOTE_VOLUME = "remote_volume_keys"
+        const val KEY_DOCK_RIGHT = "dock_on_right"
 
         /** The choices for Sleep After Music, in minutes; 0 is off. */
         val SLEEP_CHOICES = listOf(0, 2, 5, 10, 20)

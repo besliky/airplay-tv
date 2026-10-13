@@ -9,6 +9,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings as SystemSettings
+import io.github.besliky.airplaytv.BuildConfig
 import io.github.besliky.airplaytv.R
 import io.github.besliky.airplaytv.Settings
 import io.github.besliky.airplaytv.service.ReceiverService
@@ -25,6 +26,7 @@ class MainActivity : SettingsPage() {
     private lateinit var autostartRow: Row
     private lateinit var infoRow: Row
     private lateinit var autoOpenRow: Row
+    private var dockRow: Row? = null
 
     private val stateListener: (ReceiverState.Snapshot) -> Unit = { render(it) }
     private val prefsListener = SharedPreferences.OnSharedPreferenceChangeListener { _, _ -> bindRows() }
@@ -49,9 +51,15 @@ class MainActivity : SettingsPage() {
             render(ReceiverState.current)
         }
         autoOpenRow = addRow(getString(R.string.setting_auto_open)) { requestAutoOpen() }
-        addRow(getString(R.string.setting_music)) {
-            startActivity(Intent(this, MusicActivity::class.java))
-        }.navigates(true)
+        if (BuildConfig.CAR) {
+            dockRow = addRow(getString(R.string.setting_dock_side)) { settings.dockOnRight = !settings.dockOnRight }
+        }
+        // Lyrics, sleep timer and remote volume keys are TV matters; the car shows music on its own screen.
+        if (!BuildConfig.CAR) {
+            addRow(getString(R.string.setting_music)) {
+                startActivity(Intent(this, MusicActivity::class.java))
+            }.navigates(true)
+        }
         addRow(getString(R.string.setting_advanced)) {
             startActivity(Intent(this, AdvancedActivity::class.java))
         }.navigates(true)
@@ -86,6 +94,7 @@ class MainActivity : SettingsPage() {
         infoRow.value(onOff(settings.showConnectionInfo))
         autoOpenRow.visible(Build.VERSION.SDK_INT >= 29)
             .value(getString(if (canOpenAutomatically()) R.string.value_allowed else R.string.value_allow))
+        dockRow?.value(getString(if (settings.dockOnRight) R.string.value_right else R.string.value_left))
     }
 
     private fun render(s: ReceiverState.Snapshot) {

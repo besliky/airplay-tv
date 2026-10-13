@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="car_dock_width">96dp</dimen>
+    <dimen name="car_page_padding">20dp</dimen>
+    <dimen name="car_home_clock">68sp</dimen>
+    <dimen name="car_home_cover">148dp</dimen>
+    <dimen name="car_music_padding">40dp</dimen>
+    <dimen name="car_music_cover_max">460dp</dimen>
+    <dimen name="car_music_title">36sp</dimen>
+    <dimen name="car_play_size">100dp</dimen>
+    <dimen name="car_side_clock">64sp</dimen>
+</resources>

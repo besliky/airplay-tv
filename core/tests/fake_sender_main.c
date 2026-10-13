@@ -12,11 +12,12 @@
  * Streams a generated test picture (and optionally a tone) to a running
  * receiver, e.g. the app on an emulator or a TV:
  *
- *   airplaytv_sender <ip> [port] [seconds] [--pair] [--audio]
+ *   airplaytv_sender <ip> [port] [seconds] [--pair] [--audio] [--portrait]
  *   airplaytv_sender <ip> [port] [seconds] [--pair] --music
  *
  * --music plays a tone like a music app instead: no picture, but track info, a
  * cover and the position, a pause in the middle and a second track after it.
+ * --portrait sends an upright picture, as from an iPhone held upright.
  */
 
 #include <signal.h>
@@ -116,7 +117,7 @@ static int play_music(fake_sender_t *f, int seconds) {
     return 0;
 }
 
-static int play_mirror(fake_sender_t *f, int seconds, bool audio) {
+static int play_mirror(fake_sender_t *f, int seconds, bool audio, bool portrait) {
     if (fs_setup_mirror(f, 0x7e57ULL) != 0) {
         fprintf(stderr, "mirror SETUP failed\n");
         return 1;
@@ -126,8 +127,8 @@ static int play_mirror(fake_sender_t *f, int seconds, bool audio) {
         return 1;
     }
 
-    const int width = 640;
-    const int height = 352;
+    const int width = portrait ? 352 : 640;
+    const int height = portrait ? 640 : 352;
     const int fps = 30;
     h264_gen_t g;
     h264_gen_init(&g, width, height);
@@ -176,7 +177,7 @@ static int play_mirror(fake_sender_t *f, int seconds, bool audio) {
 
 int main(int argc, char **argv) {
     if (argc < 2) {
-        fprintf(stderr, "usage: %s <ip> [port] [seconds] [--pair] [--audio | --music]\n", argv[0]);
+        fprintf(stderr, "usage: %s <ip> [port] [seconds] [--pair] [--audio | --music] [--portrait]\n", argv[0]);
         return 2;
     }
     signal(SIGPIPE, SIG_IGN);
@@ -187,11 +188,13 @@ int main(int argc, char **argv) {
     bool audio = false;
     bool music = false;
     bool pin_only = false;
+    bool portrait = false;
     for (int i = 2; i < argc; i++) {
         pair |= strcmp(argv[i], "--pair") == 0;
         audio |= strcmp(argv[i], "--audio") == 0;
         music |= strcmp(argv[i], "--music") == 0;
         pin_only |= strcmp(argv[i], "--pin-screen") == 0;
+        portrait |= strcmp(argv[i], "--portrait") == 0;
     }
 
     fake_sender_t f;
@@ -225,7 +228,7 @@ int main(int argc, char **argv) {
     if (music) {
         result = fs_setup_audio(&f, 2, 352) == 0 ? play_music(&f, seconds) : 1;
     } else {
-        result = play_mirror(&f, seconds, audio);
+        result = play_mirror(&f, seconds, audio, portrait);
     }
     fs_teardown(&f, 0);
     fs_close(&f);

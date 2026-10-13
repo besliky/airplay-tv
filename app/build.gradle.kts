@@ -64,6 +64,27 @@ android {
         }
     }
 
+    // Two apps from one code base: "tv" for televisions and "car" for Android head units. The car
+    // app installs next to the TV app, has a touch interface of its own (src/car) and updates
+    // from the same releases under its own package names.
+    flavorDimensions += "form"
+    productFlavors {
+        create("tv") {
+            dimension = "form"
+            isDefault = true
+            buildConfigField("boolean", "CAR", "false")
+            buildConfigField("String", "DEFAULT_DEVICE_NAME", "\"AirPlay TV\"")
+            buildConfigField("String", "APK_PREFIX", "\"AirPlayTV\"")
+        }
+        create("car") {
+            dimension = "form"
+            applicationIdSuffix = ".car"
+            buildConfigField("boolean", "CAR", "true")
+            buildConfigField("String", "DEFAULT_DEVICE_NAME", "\"AirPlay Car\"")
+            buildConfigField("String", "APK_PREFIX", "\"AirPlayCar\"")
+        }
+    }
+
     signingConfigs {
         create("release") {
             val s = releaseSigning
@@ -186,35 +207,40 @@ androidComponents {
     }
 }
 
-// Collects the release APKs under user-facing names (AirPlayTV-v1.2.3-arm64.apk, ...) together
-// with SHA-256 checksums. CI publishes the content of build/dist as the release assets.
+// Collects the release APKs of both apps under user-facing names (AirPlayTV-v1.2.3-arm64.apk,
+// AirPlayCar-v1.2.3-arm64.apk, ...) together with SHA-256 checksums. CI publishes the content of
+// build/dist as the release assets.
 val abiLabels = mapOf(
     "arm64-v8a" to "arm64",
     "armeabi-v7a" to "armv7",
     "x86_64" to "x86_64",
     "universal" to "universal",
 )
+val apkPrefixes = mapOf("tv" to "AirPlayTV", "car" to "AirPlayCar")
 
 tasks.register("packageReleaseApks") {
     group = "distribution"
     description = "Copies release APKs to build/dist with release names and writes SHA256SUMS."
     dependsOn("assembleRelease")
-    val apkDir = layout.buildDirectory.dir("outputs/apk/release")
+    val apkRoot = layout.buildDirectory.dir("outputs/apk")
     val distDir = layout.buildDirectory.dir("dist")
     val versionLabel = appVersionName
-    inputs.dir(apkDir)
+    inputs.files(apkPrefixes.keys.map { apkRoot.map { root -> root.dir("$it/release") } })
     outputs.dir(distDir)
     doLast {
         val out = distDir.get().asFile
         out.deleteRecursively()
         out.mkdirs()
         val sums = StringBuilder()
-        apkDir.get().asFile.listFiles { f -> f.extension == "apk" }.orEmpty().sortedBy { it.name }.forEach { apk ->
-            val abi = abiLabels.entries.firstOrNull { apk.name.contains("-${it.key}-") }?.value ?: return@forEach
-            val target = File(out, "AirPlayTV-v$versionLabel-$abi.apk")
-            apk.copyTo(target, overwrite = true)
-            val digest = MessageDigest.getInstance("SHA-256").digest(target.readBytes())
-            sums.append(digest.joinToString("") { "%02x".format(it) }).append("  ").append(target.name).append('\n')
+        for ((flavor, prefix) in apkPrefixes) {
+            val apkDir = apkRoot.get().dir("$flavor/release").asFile
+            apkDir.listFiles { f -> f.extension == "apk" }.orEmpty().sortedBy { it.name }.forEach { apk ->
+                val abi = abiLabels.entries.firstOrNull { apk.name.contains("-${it.key}-") }?.value ?: return@forEach
+                val target = File(out, "$prefix-v$versionLabel-$abi.apk")
+                apk.copyTo(target, overwrite = true)
+                val digest = MessageDigest.getInstance("SHA-256").digest(target.readBytes())
+                sums.append(digest.joinToString("") { "%02x".format(it) }).append("  ").append(target.name).append('\n')
+            }
         }
         File(out, "SHA256SUMS").writeText(sums.toString())
         logger.lifecycle("Release APKs written to $out")

@@ -182,7 +182,8 @@ class AdvancedActivity : SettingsPage() {
     private fun cycleResolution() {
         val next = when (settings.resolution) {
             Settings.Resolution.HD -> Settings.Resolution.FULL_HD
-            Settings.Resolution.FULL_HD -> Settings.Resolution.UHD
+            // A head unit's panel is never 4K; the car app streams the panel's own shape up to 1080p.
+            Settings.Resolution.FULL_HD -> if (BuildConfig.CAR) Settings.Resolution.HD else Settings.Resolution.UHD
             Settings.Resolution.UHD -> Settings.Resolution.HD
         }
         if (next == Settings.Resolution.UHD && !DecoderSelector.select(null).hevc4k) {

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="car_dock">#FF141416</color>
+    <color name="car_card">#FF1C1C1E</color>
+    <color name="car_button">#FF2C2C2E</color>
+    <color name="car_selected">#26FFFFFF</color>
+    <color name="car_ripple">#33FFFFFF</color>
+</resources>

@@ -7,8 +7,8 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import io.github.besliky.airplaytv.R
-import io.github.besliky.airplaytv.ui.MainActivity
-import io.github.besliky.airplaytv.ui.MirrorActivity
+import io.github.besliky.airplaytv.ui.Page
+import io.github.besliky.airplaytv.ui.Pages
 
 object Notifications {
     const val FOREGROUND_ID = 1
@@ -37,7 +37,7 @@ object Notifications {
     fun foreground(context: Context, text: String): Notification {
         val open = PendingIntent.getActivity(
             context, 0,
-            Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            Pages.intent(context, Page.HOME).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
         return Notification.Builder(context, CHANNEL_SERVICE)
@@ -57,7 +57,7 @@ object Notifications {
         val nm = context.getSystemService(NotificationManager::class.java) ?: return
         val intent = PendingIntent.getActivity(
             context, 1,
-            Intent(context, MirrorActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            Pages.intent(context, Page.MIRROR).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
         val n = Notification.Builder(context, CHANNEL_SESSION)

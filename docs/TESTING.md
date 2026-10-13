@@ -44,7 +44,15 @@ adb shell /data/local/tmp/airplaytv_sender 127.0.0.1 7000 10 --pin-screen   # wi
 
 `--music` plays like a music app instead: no picture, but track info, a cover and the
 position, a pause from 40 to 55 % of the time and a second track without a cover after it.
-The Now Playing screen opens by itself.
+The Now Playing screen opens by itself. `--portrait` sends an upright picture, as from an
+iPhone held upright; the car app then shows it next to the dock with its side panel.
+
+To try the car app on the TV emulator, give it a head unit's screen first:
+
+```
+adb shell wm size 1280x720 && adb shell wm density 240
+adb install app/build/outputs/apk/car/debug/app-car-x86_64-debug.apk
+```
 
 ```
 adb shell /data/local/tmp/airplaytv_sender 127.0.0.1 7000 30 --pair --music
@@ -66,7 +74,9 @@ adb shell am start -n io.github.besliky.airplaytv/.PreviewActivity --es show now
 ```
 
 `show` is one of `now`, `pause`, `lyrics`, `dim`, `ambient`, `blank`, `goodnight`,
-`volume`, `next`, `previous`, `photo` and `photo2`. Back restores the real state. Capture
+`volume`, `next`, `previous`, `photo` and `photo2`. Back restores the real state. In the car
+app (`io.github.besliky.airplaytv.car/io.github.besliky.airplaytv.PreviewActivity`) it fills
+the music page of the car shell. Capture
 the screen with `adb exec-out screencap -p > shot.png`.
 
 ## Verified on the Android TV emulator (API 36, x86_64)

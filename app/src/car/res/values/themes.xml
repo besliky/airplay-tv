@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.AirPlayTV.Car">
+        <item name="android:windowBackground">@android:color/black</item>
+        <item name="android:navigationBarColor">@color/car_dock</item>
+    </style>
+</resources>

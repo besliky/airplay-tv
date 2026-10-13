@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- status -->
+    <string name="status_ready">Готов</string>
+    <string name="status_starting">Запуск…</string>
+    <string name="status_off">Выключен</string>
+    <string name="status_no_network">Нет сети</string>
+    <string name="status_error">Недоступен</string>
+    <string name="status_connected">Подключено</string>
+    <string name="hint_waiting">Ожидание iPhone</string>
+    <string name="hint_no_network">Подключите телевизор к Wi‑Fi или Ethernet</string>
+    <string name="hint_off">AirPlay выключен</string>
+    <string name="hint_mirroring">%1$s подключён</string>
+    <string name="hint_error">Приёмник не запустился</string>
+    <string name="notification_ready">Готов как «%1$s»</string>
+    <string name="notification_session">%1$s хочет показать свой экран. Выберите, чтобы открыть.</string>
+    <string name="channel_receiver">Приёмник AirPlay</string>
+    <string name="channel_session">Повтор экрана</string>
+
+    <!-- playback -->
+    <string name="playback_connecting">Подключение…</string>
+    <string name="playback_waiting_for">Ожидание %1$s</string>
+    <string name="playback_audio_only">Звук с %1$s</string>
+    <string name="pin_hint">Введите этот код на iPhone</string>
+
+    <!-- settings -->
+    <string name="setting_device_name">Имя устройства</string>
+    <string name="setting_airplay">AirPlay</string>
+    <string name="setting_require_pin">Запрашивать PIN</string>
+    <string name="setting_autostart">Запускать автоматически</string>
+    <string name="setting_connection_info">Показывать адрес</string>
+    <string name="setting_auto_open">Открывать автоматически</string>
+    <string name="setting_advanced">Дополнительно</string>
+    <string name="value_on">Вкл.</string>
+    <string name="value_off">Выкл.</string>
+    <string name="value_allowed">Разрешено</string>
+    <string name="value_allow">Разрешить</string>
+    <string name="value_automatic">Автоматически</string>
+    <string name="setting_dock_side">Сторона дока</string>
+    <string name="value_left">Слева</string>
+    <string name="value_right">Справа</string>
+
+    <string name="advanced_title">Дополнительно</string>
+    <string name="setting_decoder">Декодер</string>
+    <string name="setting_resolution">Предел разрешения</string>
+    <string name="setting_frame_rate">Частота кадров</string>
+    <string name="setting_overlay">Статистика поверх картинки</string>
+    <string name="setting_logs">Подробные журналы</string>
+    <string name="setting_diagnostics">Экспорт диагностики</string>
+    <string name="setting_reset_pairing">Сбросить сопряжение</string>
+    <string name="setting_paired_devices">Сопряжённые устройства</string>
+    <string name="setting_licenses">Лицензии открытого ПО</string>
+    <string name="value_fps">%1$d к/с</string>
+    <string name="value_4k_unavailable">Для 4K нужен аппаратный декодер HEVC</string>
+
+    <!-- dialogs -->
+    <string name="dialog_name_title">Имя устройства</string>
+    <string name="dialog_name_hint">Его видно на iPhone</string>
+    <string name="dialog_ok">OK</string>
+    <string name="dialog_cancel">Отмена</string>
+    <string name="dialog_close">Закрыть</string>
+    <string name="dialog_reset_title">Сбросить сопряжение?</string>
+    <string name="dialog_reset_message">Все iPhone придётся сопрягать заново. Устройства, подключавшиеся с PIN-кодом, будут забыты.</string>
+    <string name="dialog_reset_confirm">Сбросить</string>
+    <string name="dialog_reset_done">Сопряжение сброшено.</string>
+    <string name="dialog_overlay_title">Открывать автоматически</string>
+    <string name="dialog_overlay_message">Чтобы экран iPhone появлялся сразу после начала повтора, разрешите AirPlay TV показываться поверх других приложений.\n\nВ меню этого телевизора такой настройки нет. Её можно один раз включить с компьютера:\n\nadb shell appops set %1$s SYSTEM_ALERT_WINDOW allow</string>
+    <string name="dialog_diagnostics_title">Диагностика</string>
+    <string name="dialog_diagnostics_saved">Сохранено в %1$s</string>
+    <string name="dialog_decoder_title">Декодер</string>
+
+    <!-- now playing -->
+    <string name="now_playing_from">Играет с %1$s</string>
+    <string name="lyrics_off">Тексты песен выключены</string>
+    <string name="lyrics_searching">Поиск текста…</string>
+    <string name="lyrics_not_found">Текст не найден</string>
+    <string name="lyrics_instrumental">Инструментал</string>
+    <string name="lyrics_hint">Вниз — текст песни</string>
+    <string name="lyrics_turn_on">Включите тексты песен в настройках AirPlay TV</string>
+    <string name="goodnight_countdown">Выключение через %1$s</string>
+
+    <!-- music settings -->
+    <string name="setting_music">Музыка</string>
+    <string name="music_title">Музыка</string>
+    <string name="music_hint">Когда iPhone включает музыку на этом телевизоре, телевизор показывает, что играет, а пульт ставит на паузу и переключает треки.</string>
+    <string name="setting_lyrics">Тексты песен</string>
+    <string name="setting_sleep">Сон после музыки</string>
+    <string name="value_minutes">%1$d мин</string>
+    <string name="value_needs_setup">Нужна настройка</string>
+    <string name="dialog_lyrics_title">Тексты песен</string>
+    <string name="dialog_lyrics_message">Когда тексты включены, название и исполнитель играющей песни отправляются на lrclib.net, чтобы найти текст. Больше ничего с телевизора не уходит.\n\nВо время песни нажмите на пульте «Вниз», чтобы увидеть текст, и «Вверх» или «Назад», чтобы закрыть его.</string>
+    <string name="dialog_sleep_title">Сон после музыки</string>
+    <string name="dialog_sleep_message">Если AirPlay включил телевизор и пультом никто не пользовался, телевизор может снова уснуть через несколько минут после музыки.\n\nAndroid разрешает это только службе специальных возможностей, которую нужно один раз включить с компьютера:\n\nadb shell settings put secure enabled_accessibility_services %1$s\nadb shell settings put secure accessibility_enabled 1\n\nЕсли другие такие службы уже включены, добавьте эту в список через двоеточие. Служба не читает экран.</string>
+    <string name="sleep_service_description">Позволяет AirPlay TV усыплять телевизор после музыки. Не читает экран и не видит ваши действия.</string>
+    <string name="setting_remote_volume">Громкость с пульта</string>
+    <string name="value_tv">ТВ</string>
+    <string name="value_airplay">AirPlay</string>
+    <string name="dialog_remote_volume_title">Громкость с пульта</string>
+    <string name="dialog_remote_volume_message">Для приставок, у которых кнопки громкости не меняют звук: пока что-то играет по AirPlay, кнопки громкости и выключения звука на пульте меняют громкость AirPlay.\n\nОставьте «ТВ», если кнопки уже работают.</string>
+
+    <!-- updates -->
+    <string name="setting_update">Обновление ПО</string>
+    <string name="value_update_available">Доступна %1$s</string>
+    <string name="update_checking">Проверка обновлений…</string>
+    <string name="update_up_to_date">AirPlay TV %1$s — последняя версия.</string>
+    <string name="update_available_title">AirPlay TV %1$s</string>
+    <string name="update_install">Установить</string>
+    <string name="update_downloading">Загрузка… %1$d%%</string>
+    <string name="update_verifying">Проверка загрузки…</string>
+    <string name="update_failed_title">Обновление не удалось</string>
+    <string name="update_failed_network">Нет связи с GitHub. Проверьте интернет на телевизоре и попробуйте снова.</string>
+    <string name="update_failed_download">Загрузка неполная или повреждена. Попробуйте снова.</string>
+    <string name="update_failed_no_apk">В этом выпуске нет пакета для этого устройства (%1$s).</string>
+    <string name="update_failed_signature">Обновление подписано другим ключом, поэтому Android его не принимает. Удалите текущую версию и установите новую вручную один раз.</string>
+    <string name="update_failed_install">Android не установил обновление (%1$s).</string>
+    <string name="update_allow_title">Разрешите обновления</string>
+    <string name="update_allow_message">Чтобы ставить обновления, разрешите AirPlay TV устанавливать приложения на следующем экране. Обновление продолжится, когда вы вернётесь.</string>
+    <string name="update_allow_open">Открыть настройки</string>
+</resources>

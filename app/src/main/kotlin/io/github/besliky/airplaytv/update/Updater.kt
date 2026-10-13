@@ -52,7 +52,7 @@ object Updater {
 
     private val main = Handler(Looper.getMainLooper())
     private val executor = Executors.newSingleThreadExecutor { task -> Thread(task, "AirPlayUpdate").apply { isDaemon = true } }
-    private val userAgent = "AirPlayTV/${BuildConfig.VERSION_NAME}"
+    private val userAgent = "${BuildConfig.APK_PREFIX}/${BuildConfig.VERSION_NAME}"
 
     @Volatile
     private var cancelled = false
@@ -144,7 +144,8 @@ object Updater {
             ?.let { Asset(name, it.optString("browser_download_url"), it.optLong("size")) }
             ?.takeIf { it.url.startsWith("https://") }
         val label = packageLabel()
-        val apk = asset("AirPlayTV-v${version.name}-$label.apk") ?: asset("AirPlayTV-v${version.name}-universal.apk")
+        val apk = asset("${BuildConfig.APK_PREFIX}-v${version.name}-$label.apk")
+            ?: asset("${BuildConfig.APK_PREFIX}-v${version.name}-universal.apk")
             ?: throw Problems(Problem(R.string.update_failed_no_apk, label))
         val checksums = asset("SHA256SUMS") ?: throw Problems(Problem(R.string.update_failed_no_apk, label))
         val notes = changes(if (r.isNull("body")) "" else r.optString("body"))

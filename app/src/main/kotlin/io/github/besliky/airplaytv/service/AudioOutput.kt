@@ -49,6 +49,10 @@ class AudioOutput(context: Context) {
     @Volatile
     private var gain = 1f
 
+    /** 0 while another app holds the audio focus for a moment (a call, a parking sensor, a navigation prompt), else 1. */
+    @Volatile
+    private var focusGain = 1f
+
     @Volatile
     var bufferMs: Int = 0
         private set
@@ -95,7 +99,7 @@ class AudioOutput(context: Context) {
             t.release()
             return
         }
-        t.setVolume(gain)
+        t.setVolume(gain * focusGain)
         bufferMs = t.bufferSizeInFrames * 1000 / sampleRate
         track = t
         requestFocus(attributes)
@@ -158,7 +162,7 @@ class AudioOutput(context: Context) {
 
     fun setVolume(value: Float) {
         gain = value.coerceIn(0f, 1f)
-        track?.setVolume(gain)
+        track?.setVolume(gain * focusGain)
     }
 
     fun stop() {
@@ -176,9 +180,14 @@ class AudioOutput(context: Context) {
     private fun requestFocus(attributes: AudioAttributes) {
         val request = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
             .setAudioAttributes(attributes)
-            .setOnAudioFocusChangeListener { }
+            // Ducking is left to the system; a short exclusive interruption silences the stream until it ends.
+            .setOnAudioFocusChangeListener { change ->
+                focusGain = if (change == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT) 0f else 1f
+                track?.setVolume(gain * focusGain)
+            }
             .build()
         focusRequest = request
+        focusGain = 1f
         audioManager.requestAudioFocus(request)
     }
 
