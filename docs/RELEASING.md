@@ -25,6 +25,7 @@
 the signatures and publishes a GitHub release with:
 
 - `AirPlayTV-v<version>-arm64.apk`, `-armv7.apk`, `-x86_64.apk`, `-universal.apk`
+- `AirPlayCar-v<version>-arm64.apk` and the same set for the car app
 - `SHA256SUMS`
 - release notes with install instructions, the changelog section and checksums
 
@@ -39,7 +40,8 @@ A release can be rebuilt from an existing tag with *Run workflow* on the Release
 Advanced → Software Update reads `https://api.github.com/repos/<owner>/<name>/releases`,
 where the repository is `besliky/airplay-tv` unless the app is built with
 `-PupdateRepository=owner/name`. It needs the asset names this workflow produces
-(`AirPlayTV-v<version>-<abi>.apk` and `SHA256SUMS`) and the release signing key: a
+(`AirPlayTV-v<version>-<abi>.apk` for the TV app, `AirPlayCar-v<version>-<abi>.apk` for the
+car app, and `SHA256SUMS`) and the release signing key: a
 package signed with another key does not install over the app.
 
 ## Signing

@@ -9,7 +9,7 @@ plugins {
 // Version is taken from -PversionName (set by CI from the git tag) or defaults to the
 // in-tree development version. The version code is derived from it so that every
 // release sorts correctly: 1.2.3 -> 10203.
-val appVersionName: String = (findProperty("versionName") as String?)?.removePrefix("v") ?: "0.2.0"
+val appVersionName: String = (findProperty("versionName") as String?)?.removePrefix("v") ?: "0.3.0"
 val appVersionCode: Int = appVersionName.split('.', '-').take(3)
     .map { it.toIntOrNull() ?: 0 }
     .let { (it + listOf(0, 0, 0)).take(3) }

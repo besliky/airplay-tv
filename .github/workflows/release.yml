@@ -46,7 +46,7 @@ jobs:
           RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
           RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
           RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
-        run: ./gradlew testDebugUnitTest packageReleaseApks -PversionName="${TAG#v}"
+        run: ./gradlew testTvDebugUnitTest testCarDebugUnitTest packageReleaseApks -PversionName="${TAG#v}"
 
       - name: Verify APK signatures
         run: |
@@ -77,6 +77,11 @@ jobs:
             echo '```'
             echo
             echo "Already installed? On the TV: **Advanced → Software Update**."
+            echo
+            echo "### AirPlay Car"
+            echo
+            echo "For Android head units: **AirPlayCar-v${version}-arm64.apk** (\`armv7\` for older 32-bit units)."
+            echo "It installs next to AirPlay TV and updates itself the same way: **Settings → Advanced → Software Update**."
             echo
             if [ -s changes.md ]; then
               echo "## Changes"

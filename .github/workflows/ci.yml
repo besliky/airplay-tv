@@ -62,10 +62,10 @@ jobs:
       - uses: gradle/actions/setup-gradle@v6
 
       - name: Lint
-        run: ./gradlew lintRelease
+        run: ./gradlew lintTvRelease lintCarRelease
 
       - name: Unit tests
-        run: ./gradlew testDebugUnitTest
+        run: ./gradlew testTvDebugUnitTest testCarDebugUnitTest
 
       - name: Build debug and release APKs
         run: ./gradlew assembleDebug packageReleaseApks
@@ -76,7 +76,7 @@ jobs:
           name: AirPlayTV-${{ github.sha }}
           path: |
             app/build/dist/
-            app/build/outputs/apk/debug/*.apk
+            app/build/outputs/apk/*/debug/*.apk
           if-no-files-found: error
 
       - name: Upload reports

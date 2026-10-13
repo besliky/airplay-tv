@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.3.0] - 2026-10-13
+
+AirPlay Car: the receiver as a second app for Android head units, built from the same code.
+
+- A CarPlay-like shell for touch screens: a dock on the driver's side (clock, network, Home,
+  the phone's screen, Now Playing, Settings), Home with the track and the connection, a Now
+  Playing page with large controls, and a setup guide
+- Maps: a landscape picture fills the screen and a touch brings up Home, Music and Stop over
+  it; an upright picture stands next to the dock with the clock, the track and Stop
+  Mirroring beside it
+- The stream is advertised in the shape of the head unit's panel (1024x600, 1920x720, ...)
+- Back leaves the page, not the session; the picture opens by itself when mirroring starts
+- Dock Side setting for right-hand-drive cars, settings pages sized for head units
+- Updates from the same releases (`AirPlayCar-v<version>-<abi>.apk`); installs next to
+  AirPlay TV as `io.github.besliky.airplaytv.car`
+- Both apps: Russian translation; AirPlay audio goes quiet while another app holds the audio
+  focus for a moment
+- Test sender: `--portrait` sends an upright picture
+
 ## [0.2.0] - 2026-10-12
 
 Music, photos and updates on the TV. The music, photo and wake features are inspired by the

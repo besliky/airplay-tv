@@ -6,6 +6,9 @@ Open Control Center on the iPhone, tap *Screen Mirroring*, pick your TV — the 
 screen appears on the TV. Play music to it, and the TV shows what is playing. No app to
 open on the TV first, no account, no cloud.
 
+**New in 0.3.0: [AirPlay Car](#airplay-car)** — the same receiver for Android head units, with
+a CarPlay-like interface for maps and music.
+
 ![Home screen](docs/images/home.png)
 
 AirPlay TV is a small, open-source AirPlay receiver for Android TV and Google TV. It runs
@@ -44,7 +47,7 @@ hardware decoder straight onto the screen. The APK is about 400 KB.
 
 ## Status
 
-Version 0.2.0 adds music, photos and updates on the TV. The protocol core — pairing, PIN
+Version 0.3.0 adds AirPlay Car for Android head units; 0.2.0 added music, photos and updates on the TV. The protocol core — pairing, PIN
 pairing, session setup, the encrypted mirror and audio streams, track info, photos and all
 parsers of network input — is covered by unit, loopback and fuzz tests that run on every
 commit. The app has been run end to end on an Android TV emulator with a protocol-level test
@@ -124,10 +127,62 @@ runs a test version.
 
 <img src="docs/images/pin.png" width="480" alt="PIN pairing">
 
+## AirPlay Car
+
+**The same receiver for Android head units: the iPhone's screen and music in the car, without
+a CarPlay dongle.** Many cars have an Android head unit instead of CarPlay, and the apps that
+come with them (Carbit Link and the like) need a USB adapter, are slow and hard to use.
+AirPlay Car turns the head unit into an AirPlay receiver with an interface made for driving.
+
+| Home | Now Playing | Navigation held upright |
+|---|---|---|
+| ![Car home](docs/images/car-home.png) | ![Car music](docs/images/car-music.png) | ![Car mirroring](docs/images/car-mirror.png) |
+
+- **Laid out like CarPlay**: a dock on the driver's side (clock, network, Home, the phone's
+  screen, Now Playing, Settings), large touch targets, a dark interface. The dock moves to
+  the right for right-hand-drive cars (Settings → Dock Side)
+- **Maps**: a navigator turned sideways (Yandex Navigator, Google Maps, 2GIS) fills the whole
+  screen; a touch brings up Home, Music and Stop over it without moving the map. A navigator
+  held upright stands next to the dock at full height, with the clock, the track and Stop
+  Mirroring beside it. The picture is streamed in the shape of the head unit's panel
+  (1024×600, 1280×720, 1920×720 …), not as a 16:9 box
+- **Music**: cover, track, progress and large previous / play / next buttons that control the
+  iPhone; the steering wheel buttons do the same through the media session. The head unit's
+  own short interruptions (parking sensors, its navigation) silence AirPlay for their length
+- **Starts by itself**: the receiver runs from boot, the picture opens as soon as the iPhone
+  starts mirroring, whatever is on the head unit, and Back only leaves the page — mirroring
+  and music go on until *Stop Mirroring*
+- **Setup guide** on the head unit, in English and Russian
+- **Updates** from the same GitHub releases (Settings → Advanced → Software Update); it
+  installs next to AirPlay TV as a separate app (`io.github.besliky.airplaytv.car`)
+
+**Connecting.** The head unit and the iPhone must share a network; the iPhone's hotspot is the
+natural one:
+
+1. On the iPhone: Settings → Personal Hotspot → *Allow Others to Join*.
+2. On the head unit: join the iPhone's hotspot once in its Wi-Fi settings. It joins again by
+   itself on every drive and gets internet for maps and updates on the way.
+3. Install `AirPlayCar-v<version>-arm64.apk` (`armv7` for older 32-bit units), open AirPlay
+   Car and allow *Display over other apps* when asked.
+4. Control Center → Screen Mirroring → *AirPlay Car*. For music only, choose AirPlay Car with
+   the AirPlay button of any player.
+
+To start the music by itself, add a Shortcuts automation on the iPhone: *When the car's
+Bluetooth connects* → *Set Playback Destination: AirPlay Car* → *Play*. iOS has no automation
+that starts screen mirroring; that stays one tap in Control Center.
+
+What AirPlay cannot do in a car: touches on the head unit do not reach the iPhone (screen
+mirroring carries picture and sound only — use Siri, the phone, or the music buttons), and
+the iPhone shows its own screen rather than a CarPlay interface. Real CarPlay needs Apple's
+authentication chip in the car or a dongle. Mirroring over the iPhone's own hotspot has been
+tested only with the protocol-level test sender so far; reports from real cars are very
+welcome.
+
 ## Compatibility
 
 - **TV**: Android TV / Google TV with Android 8.0 (API 26) or newer. Phones and tablets
   work as well.
+- **Car** (AirPlay Car): Android head units with Android 8.0 or newer and Wi-Fi.
 - **CPU**: arm64-v8a (recommended), armeabi-v7a, x86_64.
 - **Senders**: iPhone, iPad and Mac. The receiver implements the AirPlay mirroring
   protocol in the same way as [UxPlay](https://github.com/FDH2/UxPlay), which works with
@@ -202,9 +257,10 @@ Requirements: JDK 17, Android SDK platform 36 and build-tools 36, NDK 28.2.13676
 CMake 3.22.1 (Gradle downloads what is missing).
 
 ```
-./gradlew assembleDebug          # debug APKs in app/build/outputs/apk/debug
-./gradlew packageReleaseApks     # release APKs + SHA256SUMS in app/build/dist
-./gradlew testDebugUnitTest lintRelease
+./gradlew assembleTvDebug        # AirPlay TV debug APKs in app/build/outputs/apk/tv/debug
+./gradlew assembleCarDebug       # AirPlay Car debug APKs in app/build/outputs/apk/car/debug
+./gradlew packageReleaseApks     # release APKs of both apps + SHA256SUMS in app/build/dist
+./gradlew testTvDebugUnitTest testCarDebugUnitTest lintTvRelease lintCarRelease
 ```
 
 Release builds are signed with your debug key unless a release key is configured, so a
@@ -235,6 +291,7 @@ release signing.
 
 ```
 app/        Android app (Kotlin, no AndroidX): service, discovery, UI
+  src/main/ shared by both apps; src/tv/ and src/car/ hold what differs (the car shell)
 core/src/   protocol core (RTSP, pairing, FairPlay setup, mirror and audio streams)
 core/android/  JNI bridge, AMediaCodec video decoder, audio pipeline
 core/third_party/  vendored Mbed TLS subset, Monocypher, playfair, ALAC decoder
@@ -258,5 +315,5 @@ AirPlay TV is free software under the GNU General Public License v3.0 or later
 (see [LICENSE](LICENSE)). It builds on UxPlay, playfair, Mbed TLS, Monocypher and an ALAC
 decoder — see [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).
 
-AirPlay, Apple TV, iPhone and iPad are trademarks of Apple Inc. This project is an
+AirPlay, CarPlay, Apple TV, iPhone and iPad are trademarks of Apple Inc. This project is an
 independent implementation and is not affiliated with or endorsed by Apple.
